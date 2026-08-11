@@ -140,7 +140,8 @@ void IRelectra::SendRaw(unsigned int *data, uint size) {
 //    18: Sleep mode On/Off
 // 17- 2: Zeros
 //     1: One
-//     0: Zero
+//     0: Zero; 
+//     Sensibo hack: bits 01: 00 - Off; 01 - On
 uint64_t IRelectra::EncodeElectra(bool notify) {
     uint64_t code = 0;
     uint32_t send_temp;
@@ -175,6 +176,7 @@ void IRelectra::UpdateFromIR(uint64_t code) {
     uint32_t send_temp;
     power_t power;
     bool notify;
+    sensibo_power_t sensibo_power;
     
     power =     (power_t)  ((code >> 33) & 1);
     mode =      (ac_mode_t)((code >> 30) & 7);
@@ -185,6 +187,7 @@ void IRelectra::UpdateFromIR(uint64_t code) {
     ifeel =     (ifeel_t)  ((code >> 24) & 1);
     send_temp = (ifeel_t)  ((code >> 19) & 31);
     sleep =     (sleep_t)  ((code >> 18) & 1);
+    sensibo_power = (sensibo_power_t)((code >> 2) & 0b11);
     
     DEBUG_LOG("IR code parsed: 0x" + String((unsigned long)code, HEX) + 
               " | Power: " + String(power == POWER_TOGGLE ? "TOGGLE" : "KEEP") + 
@@ -196,6 +199,14 @@ void IRelectra::UpdateFromIR(uint64_t code) {
     if (power == POWER_TOGGLE) {
         power_setting = !power_real;
     } 
+
+    if (sensibo_power == SENSIBO_OFF) {
+        power_setting = false;
+    }
+    if (sensibo_power == SENSIBO_ON) {
+        power_setting = true;
+    }
+
 
     if (notify) {
         ifeel_temperature = send_temp + 5;

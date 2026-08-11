@@ -63,6 +63,12 @@ enum ifeel_t
     IFEEL_ON = 1
 };
 
+enum sensibo_power_t
+{
+    SENSIBO_OFF = 0b10,
+    SENSIBO_ON = 0b01,
+};
+
 uint64_t DecodeElectraIR(decode_results &ir_ticks);
 
 class IRelectra

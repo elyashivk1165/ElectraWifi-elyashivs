@@ -634,4 +634,7 @@ void loop() {
 #ifdef HAS_BUTTONS
   handleButtons();
 #endif
+#ifdef HAS_DISPLAY
+  display_tick();
+#endif
 }

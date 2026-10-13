@@ -10,5 +10,7 @@ void display_begin();
 // fan: low|med|high|auto
 void display_show(bool power, const String& mode, int temperature, const String& fan);
 void display_link(bool wifi, bool mqtt);
+// Call from loop(): animates the screen (snow, sparks, spinning fan).
+void display_tick();
 
 #endif

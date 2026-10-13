@@ -42,6 +42,8 @@ Wiring (pin numbers as in the list above):
 - Pin 4 (power LED) through 10kΩ to `GPIO2`, and 20kΩ from `GPIO2` to `G` (the ESP32 is not 5V tolerant)
 - IR receiver `OUT` to `GPIO16`, `VCC` to `3V`, `GND` to `G` (all on the other pin row) (optional, keeps the original remote working)
 
+Buttons: the upper button (GPIO14) turns the AC on, steps through cool, heat, dry, fan and auto, then turns it off. The lower button (GPIO0) steps the fan through low, med, high and auto. The command is sent about a second after the last press. Holding the lower button for 5 seconds still triggers Homie's reset, which clears the WiFi and MQTT settings.
+
 Never power the board from USB and from the AC's 5V at the same time.
 
 ### Software

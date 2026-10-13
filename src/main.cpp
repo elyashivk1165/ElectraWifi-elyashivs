@@ -85,6 +85,10 @@ ulong ifeel_send_time = 0;
 ulong updates_send_time = 0;
 
 
+// Last state names sent out, used by the on-board buttons to pick the next value
+String current_mode = "cool";
+String current_fan = "auto";
+
 void send_updates() {
   String fan, mode, swing;
   if (ac.fan == FAN_LOW) {
@@ -113,6 +117,8 @@ void send_updates() {
     set_mode = "fan_only";
   }
   mode = ac.power_real ? set_mode : "off";
+  current_mode = set_mode;
+  current_fan = fan;
 
   if (ac.swing == SWING_ON && ac.swing_h == SWING_H_ON) {
     swing = "both";
@@ -440,6 +446,87 @@ bool rebootHandler(const HomieRange& range, const String& value) {
   return false;
 }
 
+#ifdef HAS_BUTTONS
+// Two buttons on the board. Mode: off -> cool -> heat -> dry -> fan -> auto -> off.
+// Fan: low -> med -> high -> auto. Presses only change the screen; the command
+// is sent once the buttons have been left alone for a moment.
+const char* const MODE_CYCLE[] = {"off", "cool", "heat", "dry", "fan_only", "auto"};
+const char* const FAN_CYCLE[] = {"low", "med", "high", "auto"};
+const int MODE_COUNT = sizeof(MODE_CYCLE) / sizeof(MODE_CYCLE[0]);
+const int FAN_COUNT = sizeof(FAN_CYCLE) / sizeof(FAN_CYCLE[0]);
+const ulong BUTTON_DEBOUNCE = 40;
+const ulong BUTTON_APPLY_DELAY = 1200;
+
+String pending_mode, pending_fan;
+ulong pending_time = 0;
+
+int cycle_index(const char* const cycle[], int count, const String& value) {
+  for (int i = 0; i < count; i++) {
+    if (value == cycle[i]) return i;
+  }
+  return 0;
+}
+
+bool button_pressed(uint8_t pin, bool& last_state, ulong& last_change) {
+  bool state = digitalRead(pin) == LOW;
+  ulong now = millis();
+  if (state != last_state && now - last_change > BUTTON_DEBOUNCE) {
+    last_state = state;
+    last_change = now;
+    return state;
+  }
+  return false;
+}
+
+void handleButtons() {
+  static bool mode_down = false, fan_down = false;
+  static ulong mode_change = 0, fan_change = 0;
+  bool changed = false;
+
+  if (button_pressed(PIN_BTN_MODE, mode_down, mode_change)) {
+    if (!pending_time) {
+      pending_mode = ac.power_real ? current_mode : "off";
+      pending_fan = current_fan;
+    }
+    int i = cycle_index(MODE_CYCLE, MODE_COUNT, pending_mode);
+    pending_mode = MODE_CYCLE[(i + 1) % MODE_COUNT];
+    changed = true;
+  }
+  if (button_pressed(PIN_BTN_FAN, fan_down, fan_change)) {
+    if (!pending_time) {
+      pending_mode = ac.power_real ? current_mode : "off";
+      pending_fan = current_fan;
+    }
+    int i = cycle_index(FAN_CYCLE, FAN_COUNT, pending_fan);
+    pending_fan = FAN_CYCLE[(i + 1) % FAN_COUNT];
+    changed = true;
+  }
+
+  if (changed) {
+    pending_time = millis();
+    bool on = pending_mode != "off";
+    display_show(on, on ? pending_mode : current_mode, ac.temperature, pending_fan);
+    return;
+  }
+
+  if (pending_time && millis() - pending_time > BUTTON_APPLY_DELAY) {
+    pending_time = 0;
+    DEBUG_LOG("Buttons: mode=" + pending_mode + " fan=" + pending_fan);
+    if (pending_fan == "low") {
+      ac.fan = FAN_LOW;
+    } else if (pending_fan == "med") {
+      ac.fan = FAN_MED;
+    } else if (pending_fan == "high") {
+      ac.fan = FAN_HIGH;
+    } else {
+      ac.fan = FAN_AUTO;
+    }
+    HomieRange range = {false, 0};
+    modeHandler(range, pending_mode);
+  }
+}
+#endif
+
 void setup() {
   Serial.begin(115200);
   Serial << endl << endl;
@@ -482,6 +569,10 @@ void setup() {
 #endif
   
   pinMode(POWER_PIN, INPUT_PULLUP);
+#ifdef HAS_BUTTONS
+  pinMode(PIN_BTN_MODE, INPUT_PULLUP);
+  pinMode(PIN_BTN_FAN, INPUT_PULLUP);
+#endif
 #ifdef HAS_STATUS_LEDS
   pinMode(GREEN_LED_PIN, OUTPUT);
   Homie.setLedPin(RED_LED_PIN, HIGH);
@@ -496,4 +587,7 @@ void setup() {
 void loop() {
   Homie.loop();
   handleIR();
+#ifdef HAS_BUTTONS
+  handleButtons();
+#endif
 }

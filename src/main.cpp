@@ -185,7 +185,11 @@ void loopHandler() {
   }
   */
 
-  // Handle IR recv
+}
+
+// Forwards commands from the original remote to the AC. Runs from loop(), not
+// from Homie's loop handler, so the remote keeps working while WiFi or MQTT is down.
+void handleIR() {
 #ifndef ELECTRAWIFI_NO_IR_RCV
   if (irrecv.decode(&ir_ticks)) {
     uint64_t code = 0;
@@ -491,4 +495,5 @@ void setup() {
 
 void loop() {
   Homie.loop();
+  handleIR();
 }

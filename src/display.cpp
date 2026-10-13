@@ -166,6 +166,22 @@ static void icon_auto(int cx, int cy, float r, float t, uint16_t c) {
   gfx().drawString("A", cx, cy + 1, 2);
 }
 
+// automatic fan speed: two curved arrows chasing each other in a circle
+static void icon_cycle(int cx, int cy, float r, float t, uint16_t c) {
+  uint32_t bg = use_sprite ? 0x00FFFFFF : TFT_BLACK;
+  int start = ((int)(t * 90)) % 360;
+  for (int k = 0; k < 2; k++) {
+    int a0 = (start + k * 180) % 360;
+    gfx().drawArc(cx, cy, r, r - 2.5f, a0, (a0 + 120) % 360, c, bg, true);
+    // arrowhead at the clockwise end (TFT_eSPI arcs start at 6 o'clock)
+    float a = (a0 + 120) * DEG_TO_RAD, rm = r - 1.25f;
+    float px = cx - sinf(a) * rm, py = cy + cosf(a) * rm;
+    float tx = -cosf(a), ty = -sinf(a);  // direction of travel
+    float nx = -sinf(a), ny = cosf(a);   // outward
+    gfx().fillTriangle(px + tx * 4, py + ty * 4, px + nx * 3.5f, py + ny * 3.5f, px - nx * 3.5f, py - ny * 3.5f, c);
+  }
+}
+
 static void icon_moon(int cx, int cy, float r, uint16_t c) {
   uint16_t behind = read_px(cx + r * 0.42f, cy - r * 0.3f);
   gfx().fillSmoothCircle(cx, cy, r * 0.8f, c);
@@ -291,7 +307,6 @@ static void draw_frame(float t) {
   if (on) {
     // temperature tile
     if (use_sprite) draw_shine(t);
-    blit_right(HW_LABEL_SET, T1X + T1W - 12, 18, blend(150, ink, m.color));
     int tw = number_width(HW_DIG_HUGE, cur_temp, 3);
     int tx = 84 - tw / 2;
     draw_number(HW_DIG_HUGE, cur_temp, tx, 60, 3, ink);
@@ -312,7 +327,7 @@ static void draw_frame(float t) {
     if (fan_level(cur_fan) == 0) {
       gfx().fillSmoothCircle(292, 104, 14, fan_tile);
       gfx().fillSmoothCircle(292, 104, 12, m.color);
-      icon_auto(292, 104, 9, t, ink);
+      icon_cycle(292, 104, 8, t, ink);
     }
   } else {
     // off: a moon and "off" in the big tile, the last setting in dim colors

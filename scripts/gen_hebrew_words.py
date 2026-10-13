@@ -24,7 +24,6 @@ GROUPS = [
     ("BOOT", 33, 700, [("BRAND", "אלקטרה")], False),
     ("SMALL", 17, 500, MODES + [("STARTING", "מתחבר...")], False),
     ("OFF", 40, 800, [("OFF", "כבוי")], False),
-    ("LABEL", 14, 500, [("SET", "מכוון ל")], False),
     ("DIG_HUGE", 96, 800, DIGITS, True),
     ("DIG_SMALL", 17, 500, DIGITS, True),
 ]

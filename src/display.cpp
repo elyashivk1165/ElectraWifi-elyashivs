@@ -295,7 +295,7 @@ static void draw_frame(float t) {
     int tw = number_width(HW_DIG_HUGE, cur_temp, 3);
     int tx = 84 - tw / 2;
     draw_number(HW_DIG_HUGE, cur_temp, tx, 60, 3, ink);
-    draw_degrees_c(min(tx + tw + 4, T1X + T1W - 36), 56, blend(190, ink, m.color));
+    draw_degrees_c(162, 48, blend(190, ink, m.color));
     draw_link_dot(20, 21, t, ink);
 
     // mode tile
@@ -304,7 +304,7 @@ static void draw_frame(float t) {
     gfx().fillSmoothRoundRect(200, 8, 112, 72, 12, mode_bg);
     mode_icon(cur_mode, 256, 32, 15, t, m.color);
     const HebrewWord& name = mode_word(cur_mode, true);
-    blit(name, 256 - name.w / 2, 52, m.color);
+    blit(name, 256 - name.w / 2, 55, m.color);
 
     // fan tile: just the bars, with a badge on the top right when the speed is automatic
     gfx().fillSmoothRoundRect(198, 88, 116, 76, 14, fan_tile);
@@ -316,12 +316,12 @@ static void draw_frame(float t) {
     }
   } else {
     // off: a moon and "off" in the big tile, the last setting in dim colors
-    icon_moon(99, 62, 22, blend((uint8_t)(150 + 50 * sinf(t * 1.5f)), rgb(217, 224, 255), rgb(18, 22, 26)));
+    icon_moon(99, 66, 22, blend((uint8_t)(150 + 50 * sinf(t * 1.5f)), rgb(217, 224, 255), rgb(18, 22, 26)));
     blit(HW_OFF_OFF, 99 - HW_OFF_OFF.w / 2, 98, blend(140, TFT_WHITE, rgb(18, 22, 26)));
     draw_link_dot(20, 21, t, rgb(18, 22, 26));
     const uint16_t dim_tile = rgb(16, 19, 23), dim = blend(77, TFT_WHITE, dim_tile);
     gfx().fillSmoothRoundRect(198, 6, 116, 76, 14, dim_tile);
-    mode_icon(cur_mode, 256, 30, 13, 0, dim);
+    mode_icon(cur_mode, 256, 32, 13, 0, dim);
     const HebrewWord& word = mode_word(cur_mode, false);
     int nw = number_width(HW_DIG_SMALL, cur_temp, 1);
     int total = word.w + 14 + nw;
@@ -330,7 +330,6 @@ static void draw_frame(float t) {
     gfx().drawCircle(left + nw + 4, 58, 2, dim);
     blit_right(word, left + total, 56, dim);
     gfx().fillSmoothRoundRect(198, 88, 116, 76, 14, dim_tile);
-    draw_fan_bars(220, 152, 72, 50, cur_fan == "auto" ? "high" : cur_fan, blend(40, TFT_WHITE, dim_tile), blend(18, TFT_WHITE, dim_tile), 0);
   }
 
   if (use_sprite) frame.pushSprite(0, 0);

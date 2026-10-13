@@ -40,7 +40,7 @@ Wiring (pin numbers as in the list above):
 - Pin 1 (5V) to `5V`, connector shell to `G`
 - Pin 3 (IR signal) to the collector of an NPN transistor; emitter to `G`; base through 1kΩ to `GPIO1`
 - Pin 4 (power LED) through 10kΩ to `GPIO2`, and 20kΩ from `GPIO2` to `G` (the ESP32 is not 5V tolerant)
-- IR receiver `OUT` to `GPIO10`, `VCC` to `3V`, `GND` to `G` (optional, keeps the original remote working)
+- IR receiver `OUT` to `GPIO16`, `VCC` to `3V`, `GND` to `G` (all on the other pin row) (optional, keeps the original remote working)
 
 Never power the board from USB and from the AC's 5V at the same time.
 

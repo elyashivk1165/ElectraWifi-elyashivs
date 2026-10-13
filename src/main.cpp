@@ -99,22 +99,20 @@ void send_updates() {
   
   ac.power_real = ac.power_setting;
 
-  if (ac.power_real) {
-    if (ac.mode == MODE_COOL) {
-      mode = "cool";
-    } else if (ac.mode == MODE_HEAT) {
-      mode = "heat";
-    } else if (ac.mode == MODE_DRY) {
-      mode = "dry";
-    } else if (ac.mode == MODE_AUTO) {
-      mode = "auto";
-    } else if (ac.mode == MODE_FAN) {
-      mode = "fan_only";
-    }
+  // The set mode is kept separately so the screen can show it while off
+  String set_mode;
+  if (ac.mode == MODE_COOL) {
+    set_mode = "cool";
+  } else if (ac.mode == MODE_HEAT) {
+    set_mode = "heat";
+  } else if (ac.mode == MODE_DRY) {
+    set_mode = "dry";
+  } else if (ac.mode == MODE_AUTO) {
+    set_mode = "auto";
+  } else if (ac.mode == MODE_FAN) {
+    set_mode = "fan_only";
   }
-  else {
-    mode = "off";
-  }
+  mode = ac.power_real ? set_mode : "off";
 
   if (ac.swing == SWING_ON && ac.swing_h == SWING_H_ON) {
     swing = "both";
@@ -141,7 +139,7 @@ void send_updates() {
   ifeelNode.setProperty("state").send(ac.ifeel == IFEEL_ON ? "on" : "off");
 
 #ifdef HAS_DISPLAY
-  display_show(ac.power_real, mode, ac.temperature, fan);
+  display_show(ac.power_real, set_mode, ac.temperature, fan);
 #endif
 }
 
@@ -202,6 +200,20 @@ void loopHandler() {
   }
 #endif
 }
+
+#ifdef HAS_DISPLAY
+void onHomieEvent(const HomieEvent& event) {
+  static bool wifi = false, mqtt = false;
+  switch (event.type) {
+    case HomieEventType::WIFI_CONNECTED: wifi = true; break;
+    case HomieEventType::WIFI_DISCONNECTED: wifi = false; mqtt = false; break;
+    case HomieEventType::MQTT_READY: mqtt = true; break;
+    case HomieEventType::MQTT_DISCONNECTED: mqtt = false; break;
+    default: return;
+  }
+  display_link(wifi, mqtt);
+}
+#endif
 
 bool powerHandler(const HomieRange& range, const String& value) {
   // This method is called when using the HA actions climate.turn_on and climate.turn_off
@@ -449,6 +461,9 @@ void setup() {
 #endif
   Homie_setFirmware("ElectraWifi", "1.0.0");
   Homie.setLoopFunction(loopHandler);
+#ifdef HAS_DISPLAY
+  Homie.onEvent(onHomieEvent);
+#endif
   temperatureNode.advertise("state").settable(temperatureHandler);
   fanNode.advertise("state").settable(fanHandler);
   modeNode.advertise("state").settable(modeHandler);

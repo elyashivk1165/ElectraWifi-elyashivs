@@ -20,13 +20,13 @@ DIGITS = [(str(d), str(d)) for d in range(10)]
 # Every word of one group shares the same vertical box, so words drawn at the
 # same y line up on a common baseline.
 GROUPS = [
-    ("MODE", 33, 700, MODES + [("BRAND", "אלקטרה")], False),
-    ("SMALL", 18, 500, MODES + [("STARTING", "מתחבר...")], False),
-    ("OFF", 24, 700, [("OFF", "כבוי")], False),
-    ("NIGHT", 26, 700, [("NIGHT", "לילה טוב")], False),
-    ("DIG_BIG", 58, 800, DIGITS, True),
-    ("DIG_SMALL", 18, 500, DIGITS, True),
-    ("DIG_TINY", 11, 500, DIGITS, True),
+    ("TILE", 22, 700, MODES, False),
+    ("BOOT", 33, 700, [("BRAND", "אלקטרה")], False),
+    ("SMALL", 17, 500, MODES + [("STARTING", "מתחבר...")], False),
+    ("OFF", 40, 800, [("OFF", "כבוי")], False),
+    ("LABEL", 14, 500, [("SET", "מכוון ל")], False),
+    ("DIG_HUGE", 96, 800, DIGITS, True),
+    ("DIG_SMALL", 17, 500, DIGITS, True),
 ]
 
 

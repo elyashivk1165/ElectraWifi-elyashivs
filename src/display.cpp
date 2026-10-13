@@ -12,11 +12,12 @@
 #define H 170
 #define FRAME_MS 66  // about 15 frames a second
 
-// "Glow" design: a ring around the set temperature on the left that fills
-// from 16 to 30 degrees, the mode name and icon on the top right, fan bars
-// under it, and a soft glow in the mode's color with slowly moving snow,
-// sparks, drops, wind or bubbles behind everything. The whole frame is drawn
-// into a sprite and pushed at once so nothing flickers.
+// "Tiles" design: three rounded tiles. The big one on the left shows the set
+// temperature in dark digits on a fade of the mode's colors, with a light
+// band sliding across it. Top right: the mode icon and name. Bottom right:
+// the fan bars, with an "auto" badge on their top right corner when the fan
+// speed is automatic. The whole frame is drawn into a sprite and pushed at
+// once so nothing flickers.
 
 static TFT_eSPI tft = TFT_eSPI();
 static TFT_eSprite frame = TFT_eSprite(&tft);
@@ -94,11 +95,11 @@ static void draw_number(const HebrewWord* digits, int value, int x, int y, int g
 }
 
 static const HebrewWord& mode_word(const String& mode, bool big) {
-  if (mode == "heat") return big ? HW_MODE_HEAT : HW_SMALL_HEAT;
-  if (mode == "dry") return big ? HW_MODE_DRY : HW_SMALL_DRY;
-  if (mode == "auto") return big ? HW_MODE_AUTO : HW_SMALL_AUTO;
-  if (mode == "fan_only") return big ? HW_MODE_FAN : HW_SMALL_FAN;
-  return big ? HW_MODE_COOL : HW_SMALL_COOL;
+  if (mode == "heat") return big ? HW_TILE_HEAT : HW_SMALL_HEAT;
+  if (mode == "dry") return big ? HW_TILE_DRY : HW_SMALL_DRY;
+  if (mode == "auto") return big ? HW_TILE_AUTO : HW_SMALL_AUTO;
+  if (mode == "fan_only") return big ? HW_TILE_FAN : HW_SMALL_FAN;
+  return big ? HW_TILE_COOL : HW_SMALL_COOL;
 }
 
 static int fan_level(const String& fan) {
@@ -106,11 +107,6 @@ static int fan_level(const String& fan) {
   if (fan == "med") return 2;
   if (fan == "high") return 3;
   return 0;  // auto
-}
-
-static float rnd(int i, int k) {
-  float s = sinf(i * 127.1f + k * 311.7f) * 43758.5453f;
-  return s - floorf(s);
 }
 
 static void line(float ax, float ay, float bx, float by, float width, uint16_t color) {
@@ -186,67 +182,85 @@ static void mode_icon(const String& mode, int cx, int cy, float r, float t, uint
 
 // --- pieces of the screen ---
 
+// 4x4 ordered dither, so soft color fades don't break into visible bands on
+// the screen's 16-bit colors
+static const uint8_t BAYER[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
+
+static uint16_t mix_dither(float f, uint16_t c1, uint16_t c2, int x, int y) {
+  float r1 = (c1 >> 11) * 255 / 31.0f, g1 = ((c1 >> 5) & 63) * 255 / 63.0f, b1 = (c1 & 31) * 255 / 31.0f;
+  float r2 = (c2 >> 11) * 255 / 31.0f, g2 = ((c2 >> 5) & 63) * 255 / 63.0f, b2 = (c2 & 31) * 255 / 31.0f;
+  float d = BAYER[y & 3][x & 3] / 16.0f - 0.47f;
+  int r = (int)((r1 + (r2 - r1) * f) / 8.226f + d);   // 255/31
+  int g = (int)((g1 + (g2 - g1) * f) / 4.048f + d);   // 255/63
+  int b = (int)((b1 + (b2 - b1) * f) / 8.226f + d);
+  r = constrain(r, 0, 31); g = constrain(g, 0, 63); b = constrain(b, 0, 31);
+  return (r << 11) | (g << 5) | b;
+}
+
+// Coverage (0..255) of a pixel by a rounded rectangle, for soft corners.
+static uint8_t round_rect_cover(int px, int py, int x, int y, int w, int h, int r) {
+  float cx = constrain((float)px + 0.5f, (float)(x + r), (float)(x + w - r));
+  float cy = constrain((float)py + 0.5f, (float)(y + r), (float)(y + h - r));
+  float dx = px + 0.5f - cx, dy = py + 0.5f - cy;
+  float d = sqrtf(dx * dx + dy * dy) - r;
+  if (d <= -0.5f) return 255;
+  if (d >= 0.5f) return 0;
+  return (uint8_t)(255 * (0.5f - d));
+}
+
+static const uint16_t SCREEN_BG = 0x0041;  // near black, #06080a
+
+// Big temperature tile: a diagonal fade between the mode's two colors.
+#define T1X 6
+#define T1Y 6
+#define T1W 186
+#define T1H 158
+
 static void build_background() {
   ModeLook m = look_for(cur_mode);
-  uint16_t top = cur_power ? m.deep : rgb(9, 11, 18);
-  for (int y = 0; y < H; y++) {
-    uint16_t row = blend(255 - y * 255 / H, top, TFT_BLACK);
-    for (int x = 0; x < W; x++) {
-      uint16_t c = row;
+  gfx().fillRect(0, 0, W, H, SCREEN_BG);
+  for (int y = T1Y; y < T1Y + T1H; y++) {
+    for (int x = T1X; x < T1X + T1W; x++) {
+      uint8_t cover = round_rect_cover(x, y, T1X, T1Y, T1W, T1H, 16);
+      if (!cover) continue;
+      uint16_t c;
       if (cur_power) {
-        float dx = x - 86, dy = y - 90, d = sqrtf(dx * dx + dy * dy);
-        if (d < 150) c = blend((uint8_t)(90 * (1 - d / 150)), m.color, row);
+        float f = ((x - T1X) + (y - T1Y)) / (float)(T1W + T1H);
+        c = mix_dither(f, m.color, m.color2, x, y);
+      } else {
+        c = rgb(18, 22, 26);
       }
-      gfx().drawPixel(x, y, c);
+      gfx().drawPixel(x, y, cover == 255 ? c : blend(cover, c, SCREEN_BG));
     }
   }
   if (use_sprite && background) memcpy(background, frame.getPointer(), W * H * 2);
   background_dirty = false;
 }
 
-static void draw_particles(const String& mode, float t, uint16_t color, uint16_t bg) {
-  for (int i = 0; i < 20; i++) {
-    float x0 = rnd(i, 1) * W, y0 = rnd(i, 2) * (H + 20), sp = 8 + rnd(i, 3) * 14, sz = 0.8f + rnd(i, 4) * 1.8f;
-    float x, y;
-    uint16_t c;
-    if (mode == "heat") {
-      float p = fmodf(y0 + t * sp * 1.4f, H + 20) / (H + 20);
-      x = x0 + sinf(t * 2 + i) * 4; y = H + 10 - p * (H + 20);
-      c = blend((uint8_t)(160 * (1 - p)), (i % 3) ? color : rgb(255, 224, 138), bg);
-    } else if (mode == "dry") {
-      x = x0; y = fmodf(y0 + t * sp * 2.2f, H + 20) - 10;
-      c = blend(80, color, bg);
-      gfx().fillEllipse(x, y, sz * 0.8f + 0.5f, sz * 1.8f, c);
-      continue;
-    } else if (mode == "fan_only") {
-      x = fmodf(x0 + t * sp * 6, W + 60) - 30; y = rnd(i, 6) * H;
-      float len = 14 + rnd(i, 7) * 26;
-      gfx().drawFastHLine(x, y, len, blend(40 + 30 * rnd(i, 8), color, bg));
-      continue;
-    } else if (mode == "auto") {
-      float p = fmodf(y0 + t * sp * 0.7f, H + 20) / (H + 20);
-      x = x0 + sinf(t + i) * 8; y = H + 10 - p * (H + 20);
-      gfx().drawCircle(x, y, sz * 1.8f, blend((uint8_t)(90 * (1 - p * 0.6f)), (i % 2) ? color : rgb(255, 143, 224), bg));
-      continue;
-    } else if (mode == "off") {
-      x = x0; y = rnd(i, 9) * H;
-      c = blend((uint8_t)(20 + 56 * (0.5f + 0.5f * sinf(t * 1.5f + i * 2))), rgb(207, 216, 255), bg);
-    } else {  // cool: falling snow
-      x = x0 + sinf(t * 0.8f + i) * 6; y = fmodf(y0 + t * sp, H + 20) - 10;
-      c = blend((uint8_t)(64 + 90 * rnd(i, 5)), TFT_WHITE, bg);
+// A soft light band that slides across the temperature tile now and then.
+static void draw_shine(float t) {
+  float sx = fmodf(t * 70, 520) - 160;
+  for (int y = T1Y; y < T1Y + T1H; y++) {
+    float base = sx + 40 - (y * 60.0f / H);  // the band leans to the right
+    int x0 = max((int)base, T1X), x1 = min((int)(base + 70), T1X + T1W);
+    for (int x = x0; x < x1; x++) {
+      if (round_rect_cover(x, y, T1X, T1Y, T1W, T1H, 16) < 255) continue;
+      float k = 1 - fabsf((x - base) / 35.0f - 1);
+      if (k <= 0) continue;
+      gfx().drawPixel(x, y, blend((uint8_t)(72 * k), TFT_WHITE, read_px(x, y)));
     }
-    gfx().fillCircle(x, y, sz < 1.4f ? 1 : 2, c);
   }
 }
 
-static void draw_link_dot(float t) {
+static void draw_link_dot(int x, int y, float t, uint16_t ring) {
   uint16_t c = link_mqtt ? rgb(62, 224, 122) : (link_wifi ? rgb(255, 174, 43) : rgb(255, 75, 75));
-  if (!link_mqtt) c = blend((uint8_t)(140 + 115 * sinf(t * 4)), c, TFT_BLACK);
-  gfx().fillSmoothCircle(10, 10, 4, c);
+  if (!link_mqtt) c = blend((uint8_t)(140 + 115 * sinf(t * 4)), c, ring);
+  gfx().fillSmoothCircle(x, y, 6, ring);
+  gfx().fillSmoothCircle(x, y, 4, c);
 }
 
 static void draw_fan_bars(int x, int bottom, int w, int h, const String& fan, uint16_t color, uint16_t dim, float t) {
-  const int n = 4, gap = 5;
+  const int n = 4, gap = 6;
   int bw = (w - gap * (n - 1)) / n;
   int level = fan_level(fan);
   for (int i = 0; i < n; i++) {
@@ -254,26 +268,16 @@ static void draw_fan_bars(int x, int bottom, int w, int h, const String& fan, ui
     uint16_t c = dim;
     if (level == 0) c = blend((uint8_t)(90 + 165 * (0.5f + 0.5f * sinf(t * 4 - i * 0.9f))), color, dim);
     else if (i < level) c = color;
-    gfx().fillSmoothRoundRect(x + i * (bw + gap), bottom - bh, bw, bh, 3, c, use_sprite ? 0x00FFFFFF : TFT_BLACK);
+    gfx().fillSmoothRoundRect(x + i * (bw + gap), bottom - bh, bw, bh, 3, c, use_sprite ? 0x00FFFFFF : SCREEN_BG);
   }
 }
 
-static void draw_ring(int cx, int cy, int r, int temp, const ModeLook& m, bool on) {
-  uint32_t bg = use_sprite ? 0x00FFFFFF : TFT_BLACK;
-  // TFT_eSPI arcs start at 6 o'clock and go clockwise: 45..315 is the open-bottom ring
-  gfx().drawArc(cx, cy, r + 5, r - 5, 45, 315, blend(22, TFT_WHITE, TFT_BLACK), bg, true);
-  if (!on) return;
-  int span = constrain((temp - 16) * 270 / 14, 4, 270);
-  const int step = 15;
-  for (int a = 0; a < span; a += step) {
-    int e = min(a + step + 1, span);
-    uint16_t c = blend((uint8_t)(255 * (a + e) / 2 / 270), m.color, m.color2);
-    gfx().drawArc(cx, cy, r + 5, r - 5, 45 + a, 45 + e, c, bg, true);
-  }
-  float ka = (45 + span) * DEG_TO_RAD;
-  int kx = cx - sinf(ka) * r, ky = cy + cosf(ka) * r;
-  gfx().fillSmoothCircle(kx, ky, 7, TFT_WHITE);
-  gfx().fillSmoothCircle(kx, ky, 3, m.color);
+static void draw_degrees_c(int x, int y, uint16_t color) {
+  gfx().drawCircle(x + 4, y + 4, 4, color);
+  gfx().drawCircle(x + 4, y + 4, 3, color);
+  gfx().setTextColor(color);
+  gfx().setTextDatum(TL_DATUM);
+  gfx().drawString("C", x + 11, y, 4);
 }
 
 static void draw_frame(float t) {
@@ -281,56 +285,54 @@ static void draw_frame(float t) {
   ModeLook m = look_for(cur_mode);
   if (background_dirty || !use_sprite || !background) build_background();
   else memcpy(frame.getPointer(), background, W * H * 2);
-  uint16_t glow_bg = on ? blend(70, m.color, m.deep) : rgb(5, 6, 10);
-
-  draw_particles(on ? cur_mode : "off", t, m.color, glow_bg);
-
-  const int cx = 86, cy = 92, r = 62;
-  draw_ring(cx, cy, r, cur_temp, m, on);
+  const uint16_t ink = rgb(8, 16, 24);
+  const uint16_t fan_tile = rgb(21, 26, 31);
 
   if (on) {
-    // set temperature in the ring, with a small degree mark
-    int tw = number_width(HW_DIG_BIG, cur_temp, 2);
-    int tx = cx - 2 - tw / 2;
-    draw_number(HW_DIG_BIG, cur_temp, tx, 70, 2, TFT_WHITE);
-    gfx().drawCircle(tx + tw + 8, 66, 4, m.color);
-    gfx().drawCircle(tx + tw + 8, 66, 3, m.color);
-    uint16_t label = blend(90, TFT_WHITE, TFT_BLACK);
-    draw_number(HW_DIG_TINY, 16, cx - 40 - 6, cy + r - 4, 1, label);
-    draw_number(HW_DIG_TINY, 30, cx + 40 - 6, cy + r - 4, 1, label);
+    // temperature tile
+    if (use_sprite) draw_shine(t);
+    blit_right(HW_LABEL_SET, T1X + T1W - 12, 18, blend(150, ink, m.color));
+    int tw = number_width(HW_DIG_HUGE, cur_temp, 3);
+    int tx = 84 - tw / 2;
+    draw_number(HW_DIG_HUGE, cur_temp, tx, 60, 3, ink);
+    draw_degrees_c(min(tx + tw + 4, T1X + T1W - 36), 56, blend(190, ink, m.color));
+    draw_link_dot(20, 21, t, ink);
 
-    // mode name and icon, top right
-    mode_icon(cur_mode, 292, 36, 16, t, m.color);
-    blit_right(mode_word(cur_mode, true), 268, 22, m.color);
-    gfx().drawFastHLine(176, 66, 130, blend(26, TFT_WHITE, m.deep));
+    // mode tile
+    uint16_t mode_bg = blend(36, m.color, SCREEN_BG);
+    gfx().fillSmoothRoundRect(198, 6, 116, 76, 14, blend(115, m.color, SCREEN_BG));
+    gfx().fillSmoothRoundRect(200, 8, 112, 72, 12, mode_bg);
+    mode_icon(cur_mode, 256, 32, 15, t, m.color);
+    const HebrewWord& name = mode_word(cur_mode, true);
+    blit(name, 256 - name.w / 2, 52, m.color);
 
-    // fan: bars, a spinning fan, and an "A" badge when the speed is automatic
-    uint16_t dim = blend(30, TFT_WHITE, TFT_BLACK);
-    draw_fan_bars(186, 152, 84, 48, cur_fan, m.color, dim, t);
-    int level = fan_level(cur_fan);
-    icon_fan(294, 128, 15, level == 0 ? t * 4 : t * (1.2f + 1.2f * level), blend(217, TFT_WHITE, TFT_BLACK));
-    if (level == 0) {
-      gfx().fillSmoothCircle(270, 100, 11, TFT_BLACK);
-      gfx().fillSmoothCircle(270, 100, 9, m.color);
-      gfx().setTextColor(rgb(8, 16, 24));
-      gfx().setTextDatum(MC_DATUM);
-      gfx().drawString("A", 270, 101, 2);
+    // fan tile: just the bars, with a badge on the top right when the speed is automatic
+    gfx().fillSmoothRoundRect(198, 88, 116, 76, 14, fan_tile);
+    draw_fan_bars(220, 152, 72, 50, cur_fan, m.color, blend(30, TFT_WHITE, fan_tile), t);
+    if (fan_level(cur_fan) == 0) {
+      gfx().fillSmoothCircle(292, 104, 14, fan_tile);
+      gfx().fillSmoothCircle(292, 104, 12, m.color);
+      icon_auto(292, 104, 9, t, ink);
     }
   } else {
-    // off: a moon in the ring, "good night" and the last setting on the right
-    icon_moon(cx, cy - 14, 22, rgb(217, 224, 255));
-    blit(HW_OFF_OFF, cx - HW_OFF_OFF.w / 2, cy + 14, blend(190, TFT_WHITE, TFT_BLACK));
-    blit_right(HW_NIGHT_NIGHT, 306, 42, rgb(200, 206, 232));
-    uint16_t last = blend(190, m.color, TFT_BLACK);
-    mode_icon(cur_mode, 290, 112, 11, 0, blend(150, m.color, TFT_BLACK));
+    // off: a moon and "off" in the big tile, the last setting in dim colors
+    icon_moon(99, 62, 22, blend((uint8_t)(150 + 50 * sinf(t * 1.5f)), rgb(217, 224, 255), rgb(18, 22, 26)));
+    blit(HW_OFF_OFF, 99 - HW_OFF_OFF.w / 2, 98, blend(140, TFT_WHITE, rgb(18, 22, 26)));
+    draw_link_dot(20, 21, t, rgb(18, 22, 26));
+    const uint16_t dim_tile = rgb(16, 19, 23), dim = blend(77, TFT_WHITE, dim_tile);
+    gfx().fillSmoothRoundRect(198, 6, 116, 76, 14, dim_tile);
+    mode_icon(cur_mode, 256, 30, 13, 0, dim);
     const HebrewWord& word = mode_word(cur_mode, false);
-    blit_right(word, 272, 105, last);
-    int dx = 272 - word.w - 10 - 8 - number_width(HW_DIG_SMALL, cur_temp, 1);
-    draw_number(HW_DIG_SMALL, cur_temp, dx, 105, 1, last);
-    gfx().drawCircle(dx + number_width(HW_DIG_SMALL, cur_temp, 1) + 4, 107, 2, last);
+    int nw = number_width(HW_DIG_SMALL, cur_temp, 1);
+    int total = word.w + 14 + nw;
+    int left = 256 - total / 2;
+    draw_number(HW_DIG_SMALL, cur_temp, left, 56, 1, dim);
+    gfx().drawCircle(left + nw + 4, 58, 2, dim);
+    blit_right(word, left + total, 56, dim);
+    gfx().fillSmoothRoundRect(198, 88, 116, 76, 14, dim_tile);
+    draw_fan_bars(220, 152, 72, 50, cur_fan == "auto" ? "high" : cur_fan, blend(40, TFT_WHITE, dim_tile), blend(18, TFT_WHITE, dim_tile), 0);
   }
 
-  draw_link_dot(t);
   if (use_sprite) frame.pushSprite(0, 0);
 }
 
@@ -350,7 +352,7 @@ void display_begin() {
     frame.fillSprite(TFT_BLACK);
   }
 
-  blit(HW_MODE_BRAND, (W - HW_MODE_BRAND.w) / 2, 55, TFT_WHITE);
+  blit(HW_BOOT_BRAND, (W - HW_BOOT_BRAND.w) / 2, 55, TFT_WHITE);
   blit(HW_SMALL_STARTING, (W - HW_SMALL_STARTING.w) / 2, 100, rgb(107, 119, 116));
   if (use_sprite) frame.pushSprite(0, 0);
 }

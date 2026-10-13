@@ -44,6 +44,8 @@ Wiring (pin numbers as in the list above):
 
 Buttons: the upper button (GPIO14) turns the AC on, steps through cool, heat, dry, fan and auto, then turns it off. The lower button (GPIO0) steps the fan through low, med, high and auto. The command is sent about a second after the last press. Holding the lower button for 5 seconds still triggers Homie's reset, which clears the WiFi and MQTT settings.
 
+Home Assistant: this environment announces the AC through MQTT discovery, so it appears under Settings → Devices & Services → MQTT as soon as the board connects. The manual `climate` YAML below is not needed for it.
+
 Never power the board from USB and from the AC's 5V at the same time.
 
 ### Software

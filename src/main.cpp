@@ -211,17 +211,61 @@ void handleIR() {
 #endif
 }
 
-#ifdef HAS_DISPLAY
+#ifdef HA_DISCOVERY
+// Announces the AC to Home Assistant through MQTT discovery, so it shows up as a
+// climate entity without any YAML. Uses the same topics as the manual setup in the README.
+void publishDiscovery() {
+  const HomieInternals::ConfigStruct& cfg = Homie.getConfiguration();
+  String base = String(cfg.mqtt.baseTopic) + cfg.deviceId + "/";
+  String id = String("electrawifi_") + cfg.deviceId;
+
+  String payload = "{";
+  payload += "\"name\":null,";
+  payload += "\"unique_id\":\"" + id + "\",";
+  payload += "\"availability_topic\":\"" + base + "$state\",";
+  payload += "\"payload_available\":\"ready\",\"payload_not_available\":\"lost\",";
+  payload += "\"modes\":[\"off\",\"cool\",\"heat\",\"dry\",\"fan_only\",\"auto\"],";
+  payload += "\"fan_modes\":[\"low\",\"med\",\"high\",\"auto\"],";
+  payload += "\"swing_modes\":[\"off\",\"on\",\"hor\",\"both\"],";
+  payload += "\"min_temp\":16,\"max_temp\":30,\"temp_step\":1,\"precision\":1.0,\"temperature_unit\":\"C\",";
+  payload += "\"power_command_topic\":\"" + base + "power/state/set\",";
+  payload += "\"payload_on\":\"on\",\"payload_off\":\"off\",";
+  payload += "\"mode_command_topic\":\"" + base + "mode/state/set\",";
+  payload += "\"mode_state_topic\":\"" + base + "mode/state\",";
+  payload += "\"temperature_command_topic\":\"" + base + "temperature/state/set\",";
+  payload += "\"temperature_state_topic\":\"" + base + "temperature/state\",";
+  payload += "\"fan_mode_command_topic\":\"" + base + "fan/state/set\",";
+  payload += "\"fan_mode_state_topic\":\"" + base + "fan/state\",";
+  payload += "\"swing_mode_command_topic\":\"" + base + "swing/state/set\",";
+  payload += "\"swing_mode_state_topic\":\"" + base + "swing/state\",";
+  payload += "\"device\":{\"identifiers\":[\"" + id + "\"],\"manufacturer\":\"Electra\",\"model\":\"ElectraWifi\",\"name\":\"" + String(cfg.name) + "\"}";
+  payload += "}";
+
+  String topic = "homeassistant/climate/" + id + "/config";
+  Homie.getMqttClient().publish(topic.c_str(), 1, true, payload.c_str());
+  DEBUG_LOG("Published Home Assistant discovery to " + topic);
+}
+#endif
+
+#if defined(HAS_DISPLAY) || defined(HA_DISCOVERY)
 void onHomieEvent(const HomieEvent& event) {
   static bool wifi = false, mqtt = false;
   switch (event.type) {
     case HomieEventType::WIFI_CONNECTED: wifi = true; break;
     case HomieEventType::WIFI_DISCONNECTED: wifi = false; mqtt = false; break;
-    case HomieEventType::MQTT_READY: mqtt = true; break;
+    case HomieEventType::MQTT_READY:
+      mqtt = true;
+#ifdef HA_DISCOVERY
+      publishDiscovery();
+      send_updates();
+#endif
+      break;
     case HomieEventType::MQTT_DISCONNECTED: mqtt = false; break;
     default: return;
   }
+#ifdef HAS_DISPLAY
   display_link(wifi, mqtt);
+#endif
 }
 #endif
 
@@ -552,7 +596,7 @@ void setup() {
 #endif
   Homie_setFirmware("ElectraWifi", "1.0.0");
   Homie.setLoopFunction(loopHandler);
-#ifdef HAS_DISPLAY
+#if defined(HAS_DISPLAY) || defined(HA_DISCOVERY)
   Homie.onEvent(onHomieEvent);
 #endif
   temperatureNode.advertise("state").settable(temperatureHandler);

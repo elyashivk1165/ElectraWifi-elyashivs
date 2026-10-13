@@ -33,6 +33,17 @@ Hook everything up according to the following schematic:
 
 To use the code as-is, use GPIO4 for IR send, GPIO5 for power state input and GPIO14 for IR recv (optional).
 
+### LILYGO T-Display-S3
+The `t-display-s3` environment replaces the receiver with a LILYGO T-Display-S3 and shows the AC state (power, mode, temperature, fan) on its screen. Homie is patched automatically at build time, so no manual edits are needed for this environment.
+
+Wiring (pin numbers as in the list above):
+- Pin 1 (5V) to `5V`, connector shell to `G`
+- Pin 3 (IR signal) to the collector of an NPN transistor; emitter to `G`; base through 1kΩ to `GPIO1`
+- Pin 4 (power LED) through 10kΩ to `GPIO2`, and 20kΩ from `GPIO2` to `G` (the ESP32 is not 5V tolerant)
+- IR receiver `OUT` to `GPIO10`, `VCC` to `3V`, `GND` to `G` (optional, keeps the original remote working)
+
+Never power the board from USB and from the AC's 5V at the same time.
+
 ### Software
 The code in this repo is based on [Homie](https://github.com/homieiot/homie-esp8266) for MQTT handling and for OTA.
 Please follow the instructions there to install all the dependencies.

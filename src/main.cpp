@@ -6,6 +6,7 @@
 #include <IRrecv.h>
 #include <ArduinoJson.h>
 #include "IRelectra.h"
+#include "display.h"
 
 // Debug logging - controlled by DEBUG_SERIAL and DEBUG_MQTT build flags
 #if DEBUG_SERIAL && DEBUG_MQTT
@@ -49,9 +50,14 @@ HomieNode debugNode("debug", "debug","debug");
   #define PIN_IR_RECV 14
 #endif
 
+// Boards without status LEDs (ESP-01, T-Display-S3) skip the LED code
+#if !defined(ARDUINO_ESP8266_ESP01) && !defined(NO_STATUS_LEDS)
+  #define HAS_STATUS_LEDS
+#endif
+
 const uint8_t POWER_PIN = PIN_POWER;
 const uint8_t IR_PIN = PIN_IR;
-#ifndef ARDUINO_ESP8266_ESP01
+#ifdef HAS_STATUS_LEDS
 const uint8_t GREEN_LED_PIN = PIN_GREEN_LED;
 const uint8_t RED_LED_PIN = PIN_RED_LED;
 #endif
@@ -133,6 +139,10 @@ void send_updates() {
   swingNode.setProperty("state").send(swing);
   temperatureNode.setProperty("state").send(String(ac.temperature));
   ifeelNode.setProperty("state").send(ac.ifeel == IFEEL_ON ? "on" : "off");
+
+#ifdef HAS_DISPLAY
+  display_show(ac.power_real, mode, ac.temperature, fan);
+#endif
 }
 
 void loopHandler() {
@@ -140,7 +150,7 @@ void loopHandler() {
 
   // Set power led and update the power state after it's stable for a while
   uint power_state = !digitalRead(POWER_PIN);
-#ifndef ARDUINO_ESP8266_ESP01
+#ifdef HAS_STATUS_LEDS
   digitalWrite(GREEN_LED_PIN, power_state);
 #endif
   if (power_state != ac.power_real) {
@@ -417,6 +427,9 @@ bool rebootHandler(const HomieRange& range, const String& value) {
 void setup() {
   Serial.begin(115200);
   Serial << endl << endl;
+#ifdef HAS_DISPLAY
+  display_begin();
+#endif
   //Homie.disableLogging();
   
 #if DEBUG_SERIAL || DEBUG_MQTT
@@ -431,7 +444,7 @@ void setup() {
   });
 #endif
 
-#ifdef ARDUINO_ESP8266_ESP01
+#ifndef HAS_STATUS_LEDS
   Homie.disableLedFeedback();
 #endif
   Homie_setFirmware("ElectraWifi", "1.0.0");
@@ -450,7 +463,7 @@ void setup() {
 #endif
   
   pinMode(POWER_PIN, INPUT_PULLUP);
-#ifndef ARDUINO_ESP8266_ESP01
+#ifdef HAS_STATUS_LEDS
   pinMode(GREEN_LED_PIN, OUTPUT);
   Homie.setLedPin(RED_LED_PIN, HIGH);
 #endif

@@ -162,9 +162,7 @@ static void icon_fan(int cx, int cy, float r, float angle, uint16_t c) {
 static void icon_auto(int cx, int cy, float r, float t, uint16_t c, uint16_t bg) {
   int start = ((int)(t * 70)) % 360;
   gfx().drawArc(cx, cy, r, r - 2.5f, start, (start + 270) % 360, c, bg, true);
-  gfx().setTextColor(c);
-  gfx().setTextDatum(MC_DATUM);
-  gfx().drawString("A", cx, cy + 1, 2);
+  blit(HW_ICON_A, cx - HW_ICON_A.w / 2, cy - HW_ICON_A.h / 2, c);
 }
 
 // automatic fan speed: two curved arrows chasing each other in a circle
@@ -306,9 +304,10 @@ static void draw_frame(float t) {
     // temperature tile
     if (use_sprite) draw_shine(t);
     int tw = number_width(HW_DIG_HUGE, cur_temp, 3);
-    int tx = 84 - tw / 2;
+    // the number and the degree C (32 wide, 6 apart) centered together in the tile
+    int tx = T1X + (T1W - (tw + 6 + 32)) / 2;
     draw_number(HW_DIG_HUGE, cur_temp, tx, 60, 3, ink);
-    draw_degrees_c(162, 48, blend(190, ink, m.color));
+    draw_degrees_c(tx + tw + 6, 48, blend(190, ink, m.color));
     draw_link_dot(20, 21, t, ink);
 
     // mode tile

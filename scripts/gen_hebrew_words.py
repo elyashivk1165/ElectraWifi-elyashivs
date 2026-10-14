@@ -27,6 +27,7 @@ GROUPS = [
     ("DIG_HUGE", 96, 800, DIGITS, True),
     ("DIG_SMALL", 17, 500, DIGITS, True),
     ("DEG", 30, 700, [("C", "C")], False),
+    ("ICON", 17, 700, [("A", "A")], False),
 ]
 
 

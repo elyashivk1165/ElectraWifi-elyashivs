@@ -26,6 +26,7 @@ GROUPS = [
     ("OFF", 40, 800, [("OFF", "כבוי")], False),
     ("DIG_HUGE", 96, 800, DIGITS, True),
     ("DIG_SMALL", 17, 500, DIGITS, True),
+    ("DEG", 30, 700, [("C", "C")], False),
 ]
 
 

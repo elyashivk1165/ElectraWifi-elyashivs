@@ -158,17 +158,17 @@ static void icon_fan(int cx, int cy, float r, float angle, uint16_t c) {
   gfx().fillSmoothCircle(cx, cy, r * 0.16f, TFT_BLACK);
 }
 
-static void icon_auto(int cx, int cy, float r, float t, uint16_t c) {
+// bg is the color under the icon: drawArc blends its soft edges into it
+static void icon_auto(int cx, int cy, float r, float t, uint16_t c, uint16_t bg) {
   int start = ((int)(t * 70)) % 360;
-  gfx().drawArc(cx, cy, r, r - 2.5f, start, (start + 270) % 360, c, use_sprite ? 0x00FFFFFF : TFT_BLACK, true);
+  gfx().drawArc(cx, cy, r, r - 2.5f, start, (start + 270) % 360, c, bg, true);
   gfx().setTextColor(c);
   gfx().setTextDatum(MC_DATUM);
   gfx().drawString("A", cx, cy + 1, 2);
 }
 
 // automatic fan speed: two curved arrows chasing each other in a circle
-static void icon_cycle(int cx, int cy, float r, float t, uint16_t c) {
-  uint32_t bg = use_sprite ? 0x00FFFFFF : TFT_BLACK;
+static void icon_cycle(int cx, int cy, float r, float t, uint16_t c, uint16_t bg) {
   int start = ((int)(t * 90)) % 360;
   for (int k = 0; k < 2; k++) {
     int a0 = (start + k * 180) % 360;
@@ -188,10 +188,10 @@ static void icon_moon(int cx, int cy, float r, uint16_t c) {
   gfx().fillSmoothCircle(cx + r * 0.42f, cy - r * 0.3f, r * 0.8f, behind);
 }
 
-static void mode_icon(const String& mode, int cx, int cy, float r, float t, uint16_t c) {
+static void mode_icon(const String& mode, int cx, int cy, float r, float t, uint16_t c, uint16_t bg) {
   if (mode == "heat") icon_sun(cx, cy, r, t, c);
   else if (mode == "dry") icon_drop(cx, cy, r, t, c);
-  else if (mode == "auto") icon_auto(cx, cy, r, t, c);
+  else if (mode == "auto") icon_auto(cx, cy, r, t, c, bg);
   else if (mode == "fan_only") icon_fan(cx, cy, r, t * 5, c);
   else icon_snow(cx, cy, r, t, c);
 }
@@ -291,9 +291,7 @@ static void draw_fan_bars(int x, int bottom, int w, int h, const String& fan, ui
 static void draw_degrees_c(int x, int y, uint16_t color) {
   gfx().drawCircle(x + 4, y + 4, 4, color);
   gfx().drawCircle(x + 4, y + 4, 3, color);
-  gfx().setTextColor(color);
-  gfx().setTextDatum(TL_DATUM);
-  gfx().drawString("C", x + 11, y, 4);
+  blit(HW_DEG_C, x + 11, y, color);
 }
 
 static void draw_frame(float t) {
@@ -317,7 +315,7 @@ static void draw_frame(float t) {
     uint16_t mode_bg = blend(36, m.color, SCREEN_BG);
     gfx().fillSmoothRoundRect(198, 6, 116, 76, 14, blend(115, m.color, SCREEN_BG));
     gfx().fillSmoothRoundRect(200, 8, 112, 72, 12, mode_bg);
-    mode_icon(cur_mode, 256, 32, 15, t, m.color);
+    mode_icon(cur_mode, 256, 32, 15, t, m.color, mode_bg);
     const HebrewWord& name = mode_word(cur_mode, true);
     blit(name, 256 - name.w / 2, 55, m.color);
 
@@ -327,7 +325,7 @@ static void draw_frame(float t) {
     if (fan_level(cur_fan) == 0) {
       gfx().fillSmoothCircle(292, 104, 14, fan_tile);
       gfx().fillSmoothCircle(292, 104, 12, m.color);
-      icon_cycle(292, 104, 8, t, ink);
+      icon_cycle(292, 104, 8, t, ink, m.color);
     }
   } else {
     // off: a moon and "off" in the big tile, the last setting in dim colors
@@ -336,7 +334,7 @@ static void draw_frame(float t) {
     draw_link_dot(20, 21, t, rgb(18, 22, 26));
     const uint16_t dim_tile = rgb(16, 19, 23), dim = blend(77, TFT_WHITE, dim_tile);
     gfx().fillSmoothRoundRect(198, 6, 116, 76, 14, dim_tile);
-    mode_icon(cur_mode, 256, 32, 13, 0, dim);
+    mode_icon(cur_mode, 256, 32, 13, 0, dim, dim_tile);
     const HebrewWord& word = mode_word(cur_mode, false);
     int nw = number_width(HW_DIG_SMALL, cur_temp, 1);
     int total = word.w + 14 + nw;

@@ -153,7 +153,21 @@ void loopHandler() {
   ulong now = millis();
 
   // Set power led and update the power state after it's stable for a while
+#ifdef POWER_PIN_DIVIDER
+  // Measured on the real unit: about 2.9V with the AC off and 0.77V when it
+  // runs, too close to the digital threshold. Read it as a voltage instead,
+  // with hysteresis so it never chatters.
+  static bool power_level = false;
+  int power_mv = analogReadMilliVolts(POWER_PIN);
+  if (power_mv < 1200) {
+    power_level = true;
+  } else if (power_mv > 2000) {
+    power_level = false;
+  }
+  uint power_state = power_level;
+#else
   uint power_state = !digitalRead(POWER_PIN);
+#endif
 #ifdef HAS_STATUS_LEDS
   digitalWrite(GREEN_LED_PIN, power_state);
 #endif
@@ -613,9 +627,10 @@ void setup() {
 #endif
   
 #ifdef POWER_PIN_DIVIDER
-  // The line arrives through a 10k/22k divider, which already holds it; the
-  // internal pull-up would lift the "on" level too close to the input threshold.
+  // The line arrives through a 10k/22k divider and is read with the ADC, so
+  // no internal pull-up: it would lift the "on" level.
   pinMode(POWER_PIN, INPUT);
+  analogSetPinAttenuation(POWER_PIN, ADC_11db);
 #else
   pinMode(POWER_PIN, INPUT_PULLUP);
 #endif

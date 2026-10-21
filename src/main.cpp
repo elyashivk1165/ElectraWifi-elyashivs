@@ -612,7 +612,13 @@ void setup() {
   debugNode.advertise("log");
 #endif
   
+#ifdef POWER_PIN_DIVIDER
+  // The line arrives through a 10k/22k divider, which already holds it; the
+  // internal pull-up would lift the "on" level too close to the input threshold.
+  pinMode(POWER_PIN, INPUT);
+#else
   pinMode(POWER_PIN, INPUT_PULLUP);
+#endif
 #ifdef HAS_BUTTONS
   pinMode(PIN_BTN_MODE, INPUT_PULLUP);
   pinMode(PIN_BTN_FAN, INPUT_PULLUP);

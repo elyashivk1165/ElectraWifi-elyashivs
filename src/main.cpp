@@ -149,7 +149,9 @@ void send_updates() {
 #endif
 }
 
-void loopHandler() {
+// Reads the AC's "running" line. Runs from loop(), not from Homie's loop
+// handler, so the screen follows the AC even while WiFi or MQTT is down.
+void readPower() {
   ulong now = millis();
 
   // Set power led and update the power state after it's stable for a while
@@ -187,6 +189,10 @@ void loopHandler() {
   } else {
     power_change_time = 0;
   }
+}
+
+void loopHandler() {
+  ulong now = millis();
 
   // Send ifeel if relevant
   if (now - ifeel_send_time >= IFEEL_INTERVAL) {
@@ -651,6 +657,7 @@ void setup() {
 
 void loop() {
   Homie.loop();
+  readPower();
   handleIR();
 #ifdef HAS_BUTTONS
   handleButtons();

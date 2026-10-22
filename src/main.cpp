@@ -6,6 +6,7 @@
 #include <IRrecv.h>
 #include <ArduinoJson.h>
 #include "IRelectra.h"
+#include "display.h"
 
 // Debug logging - controlled by DEBUG_SERIAL and DEBUG_MQTT build flags
 #if DEBUG_SERIAL && DEBUG_MQTT
@@ -49,9 +50,14 @@ HomieNode debugNode("debug", "debug","debug");
   #define PIN_IR_RECV 14
 #endif
 
+// Boards without status LEDs (ESP-01, T-Display-S3) skip the LED code
+#if !defined(ARDUINO_ESP8266_ESP01) && !defined(NO_STATUS_LEDS)
+  #define HAS_STATUS_LEDS
+#endif
+
 const uint8_t POWER_PIN = PIN_POWER;
 const uint8_t IR_PIN = PIN_IR;
-#ifndef ARDUINO_ESP8266_ESP01
+#ifdef HAS_STATUS_LEDS
 const uint8_t GREEN_LED_PIN = PIN_GREEN_LED;
 const uint8_t RED_LED_PIN = PIN_RED_LED;
 #endif
@@ -79,6 +85,10 @@ ulong ifeel_send_time = 0;
 ulong updates_send_time = 0;
 
 
+// Last state names sent out, used by the on-board buttons to pick the next value
+String current_mode = "cool";
+String current_fan = "auto";
+
 void send_updates() {
   String fan, mode, swing;
   if (ac.fan == FAN_LOW) {
@@ -93,22 +103,22 @@ void send_updates() {
   
   ac.power_real = ac.power_setting;
 
-  if (ac.power_real) {
-    if (ac.mode == MODE_COOL) {
-      mode = "cool";
-    } else if (ac.mode == MODE_HEAT) {
-      mode = "heat";
-    } else if (ac.mode == MODE_DRY) {
-      mode = "dry";
-    } else if (ac.mode == MODE_AUTO) {
-      mode = "auto";
-    } else if (ac.mode == MODE_FAN) {
-      mode = "fan_only";
-    }
+  // The set mode is kept separately so the screen can show it while off
+  String set_mode;
+  if (ac.mode == MODE_COOL) {
+    set_mode = "cool";
+  } else if (ac.mode == MODE_HEAT) {
+    set_mode = "heat";
+  } else if (ac.mode == MODE_DRY) {
+    set_mode = "dry";
+  } else if (ac.mode == MODE_AUTO) {
+    set_mode = "auto";
+  } else if (ac.mode == MODE_FAN) {
+    set_mode = "fan_only";
   }
-  else {
-    mode = "off";
-  }
+  mode = ac.power_real ? set_mode : "off";
+  current_mode = set_mode;
+  current_fan = fan;
 
   if (ac.swing == SWING_ON && ac.swing_h == SWING_H_ON) {
     swing = "both";
@@ -133,14 +143,34 @@ void send_updates() {
   swingNode.setProperty("state").send(swing);
   temperatureNode.setProperty("state").send(String(ac.temperature));
   ifeelNode.setProperty("state").send(ac.ifeel == IFEEL_ON ? "on" : "off");
+
+#ifdef HAS_DISPLAY
+  display_show(ac.power_real, set_mode, ac.temperature, fan);
+#endif
 }
 
-void loopHandler() {
+// Reads the AC's "running" line. Runs from loop(), not from Homie's loop
+// handler, so the screen follows the AC even while WiFi or MQTT is down.
+void readPower() {
   ulong now = millis();
 
   // Set power led and update the power state after it's stable for a while
+#ifdef POWER_PIN_DIVIDER
+  // Measured on the real unit: about 2.9V with the AC off and 0.77V when it
+  // runs, too close to the digital threshold. Read it as a voltage instead,
+  // with hysteresis so it never chatters.
+  static bool power_level = false;
+  int power_mv = analogReadMilliVolts(POWER_PIN);
+  if (power_mv < 1200) {
+    power_level = true;
+  } else if (power_mv > 2000) {
+    power_level = false;
+  }
+  uint power_state = power_level;
+#else
   uint power_state = !digitalRead(POWER_PIN);
-#ifndef ARDUINO_ESP8266_ESP01
+#endif
+#ifdef HAS_STATUS_LEDS
   digitalWrite(GREEN_LED_PIN, power_state);
 #endif
   if (power_state != ac.power_real) {
@@ -159,6 +189,10 @@ void loopHandler() {
   } else {
     power_change_time = 0;
   }
+}
+
+void loopHandler() {
+  ulong now = millis();
 
   // Send ifeel if relevant
   if (now - ifeel_send_time >= IFEEL_INTERVAL) {
@@ -177,7 +211,11 @@ void loopHandler() {
   }
   */
 
-  // Handle IR recv
+}
+
+// Forwards commands from the original remote to the AC. Runs from loop(), not
+// from Homie's loop handler, so the remote keeps working while WiFi or MQTT is down.
+void handleIR() {
 #ifndef ELECTRAWIFI_NO_IR_RCV
   if (irrecv.decode(&ir_ticks)) {
     uint64_t code = 0;
@@ -192,6 +230,64 @@ void loopHandler() {
   }
 #endif
 }
+
+#ifdef HA_DISCOVERY
+// Announces the AC to Home Assistant through MQTT discovery, so it shows up as a
+// climate entity without any YAML. Uses the same topics as the manual setup in the README.
+void publishDiscovery() {
+  const HomieInternals::ConfigStruct& cfg = Homie.getConfiguration();
+  String base = String(cfg.mqtt.baseTopic) + cfg.deviceId + "/";
+  String id = String("electrawifi_") + cfg.deviceId;
+
+  String payload = "{";
+  payload += "\"name\":null,";
+  payload += "\"unique_id\":\"" + id + "\",";
+  payload += "\"availability_topic\":\"" + base + "$state\",";
+  payload += "\"payload_available\":\"ready\",\"payload_not_available\":\"lost\",";
+  payload += "\"modes\":[\"off\",\"cool\",\"heat\",\"dry\",\"fan_only\",\"auto\"],";
+  payload += "\"fan_modes\":[\"low\",\"med\",\"high\",\"auto\"],";
+  payload += "\"swing_modes\":[\"off\",\"on\",\"hor\",\"both\"],";
+  payload += "\"min_temp\":16,\"max_temp\":30,\"temp_step\":1,\"precision\":1.0,\"temperature_unit\":\"C\",";
+  payload += "\"power_command_topic\":\"" + base + "power/state/set\",";
+  payload += "\"payload_on\":\"on\",\"payload_off\":\"off\",";
+  payload += "\"mode_command_topic\":\"" + base + "mode/state/set\",";
+  payload += "\"mode_state_topic\":\"" + base + "mode/state\",";
+  payload += "\"temperature_command_topic\":\"" + base + "temperature/state/set\",";
+  payload += "\"temperature_state_topic\":\"" + base + "temperature/state\",";
+  payload += "\"fan_mode_command_topic\":\"" + base + "fan/state/set\",";
+  payload += "\"fan_mode_state_topic\":\"" + base + "fan/state\",";
+  payload += "\"swing_mode_command_topic\":\"" + base + "swing/state/set\",";
+  payload += "\"swing_mode_state_topic\":\"" + base + "swing/state\",";
+  payload += "\"device\":{\"identifiers\":[\"" + id + "\"],\"manufacturer\":\"Electra\",\"model\":\"ElectraWifi\",\"name\":\"" + String(cfg.name) + "\"}";
+  payload += "}";
+
+  String topic = "homeassistant/climate/" + id + "/config";
+  Homie.getMqttClient().publish(topic.c_str(), 1, true, payload.c_str());
+  DEBUG_LOG("Published Home Assistant discovery to " + topic);
+}
+#endif
+
+#if defined(HAS_DISPLAY) || defined(HA_DISCOVERY)
+void onHomieEvent(const HomieEvent& event) {
+  static bool wifi = false, mqtt = false;
+  switch (event.type) {
+    case HomieEventType::WIFI_CONNECTED: wifi = true; break;
+    case HomieEventType::WIFI_DISCONNECTED: wifi = false; mqtt = false; break;
+    case HomieEventType::MQTT_READY:
+      mqtt = true;
+#ifdef HA_DISCOVERY
+      publishDiscovery();
+      send_updates();
+#endif
+      break;
+    case HomieEventType::MQTT_DISCONNECTED: mqtt = false; break;
+    default: return;
+  }
+#ifdef HAS_DISPLAY
+  display_link(wifi, mqtt);
+#endif
+}
+#endif
 
 bool powerHandler(const HomieRange& range, const String& value) {
   // This method is called when using the HA actions climate.turn_on and climate.turn_off
@@ -414,9 +510,93 @@ bool rebootHandler(const HomieRange& range, const String& value) {
   return false;
 }
 
+#ifdef HAS_BUTTONS
+// Two buttons on the board. Mode: off -> cool -> heat -> dry -> fan -> auto -> off.
+// Fan: low -> med -> high -> auto. Presses only change the screen; the command
+// is sent once the buttons have been left alone for a moment.
+const char* const MODE_CYCLE[] = {"off", "cool", "heat", "dry", "fan_only", "auto"};
+const char* const FAN_CYCLE[] = {"low", "med", "high", "auto"};
+const int MODE_COUNT = sizeof(MODE_CYCLE) / sizeof(MODE_CYCLE[0]);
+const int FAN_COUNT = sizeof(FAN_CYCLE) / sizeof(FAN_CYCLE[0]);
+const ulong BUTTON_DEBOUNCE = 40;
+const ulong BUTTON_APPLY_DELAY = 1200;
+
+String pending_mode, pending_fan;
+ulong pending_time = 0;
+
+int cycle_index(const char* const cycle[], int count, const String& value) {
+  for (int i = 0; i < count; i++) {
+    if (value == cycle[i]) return i;
+  }
+  return 0;
+}
+
+bool button_pressed(uint8_t pin, bool& last_state, ulong& last_change) {
+  bool state = digitalRead(pin) == LOW;
+  ulong now = millis();
+  if (state != last_state && now - last_change > BUTTON_DEBOUNCE) {
+    last_state = state;
+    last_change = now;
+    return state;
+  }
+  return false;
+}
+
+void handleButtons() {
+  static bool mode_down = false, fan_down = false;
+  static ulong mode_change = 0, fan_change = 0;
+  bool changed = false;
+
+  if (button_pressed(PIN_BTN_MODE, mode_down, mode_change)) {
+    if (!pending_time) {
+      pending_mode = ac.power_real ? current_mode : "off";
+      pending_fan = current_fan;
+    }
+    int i = cycle_index(MODE_CYCLE, MODE_COUNT, pending_mode);
+    pending_mode = MODE_CYCLE[(i + 1) % MODE_COUNT];
+    changed = true;
+  }
+  if (button_pressed(PIN_BTN_FAN, fan_down, fan_change)) {
+    if (!pending_time) {
+      pending_mode = ac.power_real ? current_mode : "off";
+      pending_fan = current_fan;
+    }
+    int i = cycle_index(FAN_CYCLE, FAN_COUNT, pending_fan);
+    pending_fan = FAN_CYCLE[(i + 1) % FAN_COUNT];
+    changed = true;
+  }
+
+  if (changed) {
+    pending_time = millis();
+    bool on = pending_mode != "off";
+    display_show(on, on ? pending_mode : current_mode, ac.temperature, pending_fan);
+    return;
+  }
+
+  if (pending_time && millis() - pending_time > BUTTON_APPLY_DELAY) {
+    pending_time = 0;
+    DEBUG_LOG("Buttons: mode=" + pending_mode + " fan=" + pending_fan);
+    if (pending_fan == "low") {
+      ac.fan = FAN_LOW;
+    } else if (pending_fan == "med") {
+      ac.fan = FAN_MED;
+    } else if (pending_fan == "high") {
+      ac.fan = FAN_HIGH;
+    } else {
+      ac.fan = FAN_AUTO;
+    }
+    HomieRange range = {false, 0};
+    modeHandler(range, pending_mode);
+  }
+}
+#endif
+
 void setup() {
   Serial.begin(115200);
   Serial << endl << endl;
+#ifdef HAS_DISPLAY
+  display_begin();
+#endif
   //Homie.disableLogging();
   
 #if DEBUG_SERIAL || DEBUG_MQTT
@@ -431,11 +611,14 @@ void setup() {
   });
 #endif
 
-#ifdef ARDUINO_ESP8266_ESP01
+#ifndef HAS_STATUS_LEDS
   Homie.disableLedFeedback();
 #endif
   Homie_setFirmware("ElectraWifi", "1.0.0");
   Homie.setLoopFunction(loopHandler);
+#if defined(HAS_DISPLAY) || defined(HA_DISCOVERY)
+  Homie.onEvent(onHomieEvent);
+#endif
   temperatureNode.advertise("state").settable(temperatureHandler);
   fanNode.advertise("state").settable(fanHandler);
   modeNode.advertise("state").settable(modeHandler);
@@ -449,8 +632,19 @@ void setup() {
   debugNode.advertise("log");
 #endif
   
+#ifdef POWER_PIN_DIVIDER
+  // The line arrives through a 10k/22k divider and is read with the ADC, so
+  // no internal pull-up: it would lift the "on" level.
+  pinMode(POWER_PIN, INPUT);
+  analogSetPinAttenuation(POWER_PIN, ADC_11db);
+#else
   pinMode(POWER_PIN, INPUT_PULLUP);
-#ifndef ARDUINO_ESP8266_ESP01
+#endif
+#ifdef HAS_BUTTONS
+  pinMode(PIN_BTN_MODE, INPUT_PULLUP);
+  pinMode(PIN_BTN_FAN, INPUT_PULLUP);
+#endif
+#ifdef HAS_STATUS_LEDS
   pinMode(GREEN_LED_PIN, OUTPUT);
   Homie.setLedPin(RED_LED_PIN, HIGH);
 #endif
@@ -463,4 +657,12 @@ void setup() {
 
 void loop() {
   Homie.loop();
+  readPower();
+  handleIR();
+#ifdef HAS_BUTTONS
+  handleButtons();
+#endif
+#ifdef HAS_DISPLAY
+  display_tick();
+#endif
 }

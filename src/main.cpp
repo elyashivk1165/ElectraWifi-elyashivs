@@ -568,6 +568,11 @@ void handleButtons() {
   }
 
   if (changed) {
+#ifdef PIN_BUZZER
+    // short beep so a press is heard even when the AC does not answer;
+    // a 2.7 kHz tone sounds on both active and passive buzzers
+    tone(PIN_BUZZER, 2700, 60);
+#endif
     pending_time = millis();
     bool on = pending_mode != "off";
     display_show(on, on ? pending_mode : current_mode, ac.temperature, pending_fan);
@@ -649,6 +654,10 @@ void setup() {
 #ifdef HAS_BUTTONS
   pinMode(PIN_BTN_MODE, INPUT_PULLUP);
   pinMode(PIN_BTN_FAN, INPUT_PULLUP);
+#endif
+#ifdef PIN_BUZZER
+  pinMode(PIN_BUZZER, OUTPUT);
+  digitalWrite(PIN_BUZZER, LOW);
 #endif
 #ifdef HAS_STATUS_LEDS
   pinMode(GREEN_LED_PIN, OUTPUT);

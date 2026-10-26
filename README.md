@@ -39,8 +39,8 @@ The `t-display-s3` environment replaces the receiver with a LILYGO T-Display-S3 
 Wiring (pin numbers as in the list above):
 - Pin 1 (5V) to `5V`, connector shell to `G`
 - Pin 3 (IR signal) to the collector of an NPN transistor; emitter to `G`; base through 1kΩ to `GPIO1`
-- Pin 4 (power LED) through 10kΩ to `GPIO2`, and 22kΩ from `GPIO2` to `G` (the ESP32 is not 5V tolerant)
-- On units where the original receiver board provided the pull-ups (the IR and power-LED lines sit near 0V once it is unplugged), add 4.7kΩ from the IR line to `3V` and 4.7kΩ from the power-LED line (before the 10kΩ) to the 5V pin
+- Pin 4 (power LED) straight to `GPIO2`. The AC only pulls this line down (measured on an empty socket: about 0.02V off, 0.7V running, never 5V), so the chip's internal pull-up replaces the original board's LED and the line is read with the ADC with hysteresis. Check the line never exceeds 3.3V on your unit before connecting it; if it does, add a 10kΩ/22kΩ divider.
+- Pin 3 needs no pull-up on units where the AC holds the command line at 5V by itself (measured on an empty socket). Make sure the command line is really pin 3: pin 2 (heat LED) reads a steady 0V on an empty socket and ignores every command.
 - IR receiver `OUT` to `GPIO16`, `VCC` to `3V`, `GND` to `G` (all on the other pin row) (optional, keeps the original remote working)
 
 Buttons: the upper button (GPIO14) turns the AC on, steps through cool, heat, dry, fan and auto, then turns it off. The lower button (GPIO0) steps the fan through low, med, high and auto. The command is sent about a second after the last press. Holding the lower button for 5 seconds still triggers Homie's reset, which clears the WiFi and MQTT settings.

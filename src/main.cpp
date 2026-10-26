@@ -222,6 +222,10 @@ void handleIR() {
     uint64_t code = 0;
     code = DecodeElectraIR(ir_ticks);
     irrecv.resume();
+#ifdef PIN_BUZZER
+    // high beep: an Electra command was understood; low beep: IR was seen but not decoded
+    tone(PIN_BUZZER, code ? 2700 : 1500, 60);
+#endif
     if (code) {
       DEBUG_LOG("IR command received: 0x" + String((unsigned long)code, HEX));
       ac.UpdateFromIR(code);

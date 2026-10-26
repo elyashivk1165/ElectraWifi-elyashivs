@@ -33,6 +33,22 @@ Hook everything up according to the following schematic:
 
 To use the code as-is, use GPIO4 for IR send, GPIO5 for power state input and GPIO14 for IR recv (optional).
 
+### LILYGO T-Display-S3
+The `t-display-s3` environment replaces the receiver with a LILYGO T-Display-S3 and shows the AC state (power, mode, temperature, fan) on its screen. Homie is patched automatically at build time, so no manual edits are needed for this environment.
+
+Wiring (pin numbers as in the list above):
+- Pin 1 (5V) to `5V`, connector shell to `G`
+- Pin 3 (IR signal) to the collector of an NPN transistor; emitter to `G`; base through 1kΩ to `GPIO1`
+- Pin 4 (power LED) straight to `GPIO2`. The AC only pulls this line down (measured on an empty socket: about 0.02V off, 0.7V running, never 5V), so the chip's internal pull-up replaces the original board's LED and the line is read with the ADC with hysteresis. Check the line never exceeds 3.3V on your unit before connecting it; if it does, add a 10kΩ/22kΩ divider.
+- Pin 3 needs no pull-up on units where the AC holds the command line at 5V by itself (measured on an empty socket). Make sure the command line is really pin 3: pin 2 (heat LED) reads a steady 0V on an empty socket and ignores every command.
+- IR receiver `OUT` to `GPIO16`, `VCC` to `3V`, `GND` to `G` (all on the other pin row) (optional, keeps the original remote working)
+
+Buttons: the upper button (GPIO14) turns the AC on, steps through cool, heat, dry, fan and auto, then turns it off. The lower button (GPIO0) steps the fan through low, med, high and auto. The command is sent about a second after the last press. Holding the lower button for 5 seconds still triggers Homie's reset, which clears the WiFi and MQTT settings.
+
+Home Assistant: this environment announces the AC through MQTT discovery, so it appears under Settings → Devices & Services → MQTT as soon as the board connects. The manual `climate` YAML below is not needed for it.
+
+Never power the board from USB and from the AC's 5V at the same time.
+
 ### Software
 The code in this repo is based on [Homie](https://github.com/homieiot/homie-esp8266) for MQTT handling and for OTA.
 Please follow the instructions there to install all the dependencies.

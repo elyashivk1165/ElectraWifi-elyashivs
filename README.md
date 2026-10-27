@@ -39,7 +39,8 @@ The `t-display-s3` environment replaces the receiver with a LILYGO T-Display-S3 
 Wiring (pin numbers as in the list above):
 - Pin 1 (5V) to `5V`, connector shell to `G`
 - Pin 3 (IR signal) to the collector of an NPN transistor; emitter to `G`; base through 1kΩ to `GPIO1`
-- Pin 4 (power LED) straight to `GPIO2`. The AC only pulls this line down (measured on an empty socket: about 0.02V off, 0.7V running, never 5V), so the chip's internal pull-up replaces the original board's LED and the line is read with the ADC with hysteresis. Check the line never exceeds 3.3V on your unit before connecting it; if it does, add a 10kΩ/22kΩ divider.
+- Pin 4 (power LED) straight to `GPIO2`, plus 4.7kΩ from `GPIO2` to `3V` (not 5V). The AC only pulls this line down (measured on an empty socket: about 0.02V off, 0.7V running, never 5V); with the resistor the pin reads about 3V when the AC is off and under 1V when it runs, and the firmware reads it with the ADC with hysteresis. The chip's internal pull-up alone is too weak (0.1V off / 0.5V on). Check the line never exceeds 3.3V on your unit before connecting it; if it does, add a 10kΩ/22kΩ divider.
+- Buzzer: `GPIO10` through 1kΩ to the base of a second NPN transistor, emitter to `G`, collector to the buzzer's `-` leg, buzzer `+` to `5V`. Do not drive the buzzer straight from the pin, and do not wire it to the AC's beep pin (pin 6 sits at a steady 9-12V and the buzzer sounds continuously).
 - Pin 3 needs no pull-up on units where the AC holds the command line at 5V by itself (measured on an empty socket). Make sure the command line is really pin 3: pin 2 (heat LED) reads a steady 0V on an empty socket and ignores every command.
 - IR receiver `OUT` to `GPIO16`, `VCC` to `3V`, `GND` to `G` (all on the other pin row) (optional, keeps the original remote working)
 

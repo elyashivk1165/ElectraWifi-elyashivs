@@ -1,4 +1,9 @@
-# ElectraWifi
+# ElectraWifi (T-Display-S3 fork)
+
+> **This is a fork of [giladger/ElectraWifi](https://github.com/giladger/ElectraWifi).** It adds a build for the LILYGO T-Display-S3 with a Hebrew status screen, buttons, a buzzer, Home Assistant MQTT discovery and hardware-timed command output. Everything from the original project still works.
+>
+> **Full build guide for the T-Display-S3:** [English](docs/guide.md) · [עברית](docs/guide.he.md)
+
 This project intends to replace a plain Electra AC IR receiver with an ESP8266 to give it wifi capabilities and control it over MQTT.
 
 ## Description
@@ -34,7 +39,7 @@ Hook everything up according to the following schematic:
 To use the code as-is, use GPIO4 for IR send, GPIO5 for power state input and GPIO14 for IR recv (optional).
 
 ### LILYGO T-Display-S3
-The `t-display-s3` environment replaces the receiver with a LILYGO T-Display-S3 and shows the AC state (power, mode, temperature, fan) on its screen. Homie is patched automatically at build time, so no manual edits are needed for this environment.
+The `t-display-s3` environment replaces the receiver with a LILYGO T-Display-S3 and shows the AC state (power, mode, temperature, fan) on its screen. The [full guide](docs/guide.md) ([עברית](docs/guide.he.md)) covers parts, wiring diagram, measurements, flashing, Home Assistant and troubleshooting; the summary is below. Homie is patched automatically at build time, so no manual edits are needed for this environment.
 
 Wiring (pin numbers as in the list above):
 - Pin 1 (5V) to `5V`, connector shell to `G`
@@ -110,7 +115,7 @@ After the esp is configured, it will subscribe to the following MQTT topics:
   - This topic accepts a json in the following format (all fields are mandatory), updates the state and send it to the AC unit:   
   `{"power": "on|off", "mode": "cool|heat|fan_only|dry|auto", "fan": "low|med|high|auto", "temperature": 15..30, "ifeel": "on|off", "swing":"on|off|hor|both"}`
   > Note: `"fan"` is also accepted as an alias for `"fan_only"` for backward compatibility.
-- .../ifeel_temperature/state/set
+- .../ifeel-temperature/state/set
   - This topic accepts a number between 5 and 36 and sends it to the main unit as a temperature received by the "i feel" function of the remote.
 - .../reboot/trigger/set
   - Publish `true` to this topic to reboot the device remotely.
@@ -295,4 +300,4 @@ Note: The protocol only supports integer values, so the temperature will be roun
 
 ### Credits
 
-Many thanks to @barakwei and [IRelectra](https://github.com/barakwei/IRelectra) for analyzing the IR protocol.
+Based on [giladger/ElectraWifi](https://github.com/giladger/ElectraWifi). Many thanks to @barakwei and [IRelectra](https://github.com/barakwei/IRelectra) for analyzing the IR protocol.

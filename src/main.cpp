@@ -185,8 +185,8 @@ void readPower() {
 
   // Set power led and update the power state after it's stable for a while
 #ifdef POWER_PIN_ADC
-  // With the internal pull-up the line sits near 3.3V while the AC is off and
-  // the AC pulls it to about 0.7V when it runs. Read it as a voltage with
+  // With the 4.7k pull-up to 3V the line sits near 3V while the AC is off and
+  // the AC pulls it under 1V when it runs. Read it as a voltage with
   // hysteresis so it never chatters.
   static bool power_level = false;
   int power_mv = analogReadMilliVolts(POWER_PIN);
@@ -688,10 +688,10 @@ void setup() {
   
 #ifdef POWER_PIN_ADC
   // The AC only pulls this LED line down (empty socket: 0.02 V off, 0.7 V on);
-  // nothing pulls it up, so the line goes straight to the pin and the chip's
-  // own pull-up takes the place of the original display's LED, like
-  // INPUT_PULLUP on the ESP8266. It is read with the ADC and hysteresis
-  // because the 0.7 V "on" level sits too close to a digital threshold.
+  // nothing on the AC side pulls it up. A 4.7k resistor from the pin to 3V does
+  // that job (the chip's own pull-up alone is too weak: 0.1 V off, 0.5 V on) and
+  // the internal pull-up is kept on as well. It is read with the ADC and
+  // hysteresis because the "on" level sits too close to a digital threshold.
   pinMode(POWER_PIN, INPUT_PULLUP);
   analogSetPinAttenuation(POWER_PIN, ADC_11db);
   analogReadMilliVolts(POWER_PIN);        // first read configures the ADC

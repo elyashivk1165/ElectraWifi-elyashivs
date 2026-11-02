@@ -251,9 +251,9 @@ void handleIR() {
     code = DecodeElectraIR(ir_ticks);
     irrecv.resume();
 #ifdef PIN_BUZZER
-    // loud steady beep: an Electra command was understood;
-    // very short click: IR was seen but not decoded
-    beep(code ? BEEP_MS : 25);
+    // beep only for a command that was understood; noise (for example static
+    // from a hand near the screen) stays silent
+    if (code) beep();
 #endif
     if (code) {
       DEBUG_LOG("IR command received: 0x" + String((unsigned long)code, HEX));

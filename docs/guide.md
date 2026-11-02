@@ -152,7 +152,7 @@ Update later with `git pull` and the `upload` command.
 - **Screen:** large set temperature on the left, on a gradient in the mode's color; mode icon and Hebrew name top right; 3 fan bars bottom right (auto = dim bars plus an "auto" badge); a link dot top left (green = MQTT, orange = WiFi only, red = no WiFi). Animations stop 2 minutes after the last change.
 - **Upper button (GPIO14):** on, then cool → heat → dry → fan → auto → off.
 - **Lower button (GPIO0):** fan low → med → high → auto. The command is sent about a second after the last press. Holding it 5 seconds triggers Homie's reset (erases WiFi/MQTT settings).
-- **Beeps:** a normal beep = command understood and sent (remote, buttons or Home Assistant). A very short click = an IR signal was seen but not decoded.
+- **Beeps:** a beep = command understood and sent (remote, buttons or Home Assistant). No beep after a remote press = the signal was not decoded (another remote, too far, or noise); noise stays silent on purpose.
 
 ## Enclosure
 
@@ -185,6 +185,10 @@ Use an active buzzer, with `+` on 5V.
 ### No WiFi
 
 Check `config.json` and run `uploadfs` again. The ESP32 needs 2.4 GHz WiFi.
+
+### The board restarts by itself
+
+A loop watchdog restarts the board if the main loop hangs for a few seconds (for example after a static discharge from a hand near the screen). That is expected; if it happens often, check the log below.
 
 ### Remote log
 

@@ -717,6 +717,10 @@ void setup() {
   irrecv.enableIRIn();
 #endif
   Homie.setup();
+#ifdef ESP32
+  // restart by itself if the loop ever hangs (e.g. after a static discharge)
+  enableLoopWDT();
+#endif
 }
 
 void loop() {

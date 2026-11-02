@@ -279,7 +279,9 @@ void publishDiscovery() {
   payload += "\"availability_topic\":\"" + base + "$state\",";
   payload += "\"payload_available\":\"ready\",\"payload_not_available\":\"lost\",";
   payload += "\"modes\":[\"off\",\"cool\",\"heat\",\"dry\",\"fan_only\",\"auto\"],";
-  payload += "\"fan_modes\":[\"low\",\"med\",\"high\",\"auto\"],";
+  // "medium" instead of "med" so Home Assistant shows all four speeds translated
+  // (and Google knows them); the device's own topics keep "med"
+  payload += "\"fan_modes\":[\"low\",\"medium\",\"high\",\"auto\"],";
   payload += "\"swing_modes\":[\"off\",\"on\",\"hor\",\"both\"],";
   payload += "\"min_temp\":16,\"max_temp\":30,\"temp_step\":1,\"precision\":1.0,\"temperature_unit\":\"C\",";
   payload += "\"power_command_topic\":\"" + base + "power/state/set\",";
@@ -290,6 +292,8 @@ void publishDiscovery() {
   payload += "\"temperature_state_topic\":\"" + base + "temperature/state\",";
   payload += "\"fan_mode_command_topic\":\"" + base + "fan/state/set\",";
   payload += "\"fan_mode_state_topic\":\"" + base + "fan/state\",";
+  payload += "\"fan_mode_command_template\":\"{{ 'med' if value == 'medium' else value }}\",";
+  payload += "\"fan_mode_state_template\":\"{{ 'medium' if value == 'med' else value }}\",";
   payload += "\"swing_mode_command_topic\":\"" + base + "swing/state/set\",";
   payload += "\"swing_mode_state_topic\":\"" + base + "swing/state\",";
   payload += "\"device\":{\"identifiers\":[\"" + id + "\"],\"manufacturer\":\"Electra\",\"model\":\"ElectraWifi\",\"name\":\"" + String(cfg.name) + "\"}";

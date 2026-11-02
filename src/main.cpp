@@ -86,6 +86,34 @@ ulong ifeel_send_time = 0;
 ulong updates_send_time = 0;
 
 
+#ifdef PIN_BUZZER
+// The buzzer is an active one (it sounds by itself on steady power), so a
+// steady pulse is the loudest beep. Feeding it a tone() only chops it.
+const ulong BEEP_MS = 150;
+ulong beep_off_at = 0;
+bool quiet_send = false;  // set while the on-board buttons apply, they beep on press
+
+void beep(ulong ms = BEEP_MS) {
+  digitalWrite(PIN_BUZZER, HIGH);
+  beep_off_at = millis() + ms;
+  if (!beep_off_at) beep_off_at = 1;
+}
+
+void handleBeep() {
+  if (beep_off_at && (long)(millis() - beep_off_at) >= 0) {
+    digitalWrite(PIN_BUZZER, LOW);
+    beep_off_at = 0;
+  }
+}
+
+// a beep for commands that come from Home Assistant
+void beepForCommand() {
+  if (!quiet_send) beep();
+}
+#else
+void beepForCommand() {}
+#endif
+
 // Last state names sent out, used by the on-board buttons to pick the next value
 String current_mode = "cool";
 String current_fan = "auto";
@@ -223,8 +251,9 @@ void handleIR() {
     code = DecodeElectraIR(ir_ticks);
     irrecv.resume();
 #ifdef PIN_BUZZER
-    // high beep: an Electra command was understood; low beep: IR was seen but not decoded
-    tone(PIN_BUZZER, code ? 2700 : 1500, 60);
+    // loud steady beep: an Electra command was understood;
+    // very short click: IR was seen but not decoded
+    beep(code ? BEEP_MS : 25);
 #endif
     if (code) {
       DEBUG_LOG("IR command received: 0x" + String((unsigned long)code, HEX));
@@ -305,6 +334,7 @@ bool powerHandler(const HomieRange& range, const String& value) {
     DEBUG_LOG("MQTT error: invalid power value");
     return false;
   }
+  beepForCommand();
   ac.SendElectra(false);
   ac.power_real = ac.power_setting;
   powerNode.setProperty("state").send(ac.power_real ? "on": "off");
@@ -320,6 +350,7 @@ bool temperatureHandler(const HomieRange& range, const String& value) {
     return false;
   }
   ac.temperature = temp;
+  beepForCommand();
   ac.SendElectra(false);
   send_updates();
   return true;
@@ -362,6 +393,7 @@ bool fanHandler(const HomieRange& range, const String& value) {
     DEBUG_LOG("MQTT error: invalid fan value");
     return false;
   }
+  beepForCommand();
   ac.SendElectra(false);
   send_updates();
   return true;
@@ -377,6 +409,7 @@ bool ifeelHandler(const HomieRange& range, const String& value) {
     DEBUG_LOG("MQTT error: invalid ifeel value");
     return false;
   }
+  beepForCommand();
   ac.SendElectra(false);
   send_updates();
   return true;
@@ -412,6 +445,7 @@ bool swingHandler(const HomieRange& range, const String& value) {
     DEBUG_LOG("MQTT error: invalid swing value");
     return false;
   }
+  beepForCommand();
   ac.SendElectra(false);
   send_updates();
   return true;
@@ -498,6 +532,7 @@ bool jsonHandler(const HomieRange& range, const String& value) {
   }
   ac.temperature = temp;
 
+  beepForCommand();
   ac.SendElectra(false);
   ac.power_real = ac.power_setting;
 
@@ -573,9 +608,8 @@ void handleButtons() {
 
   if (changed) {
 #ifdef PIN_BUZZER
-    // short beep so a press is heard even when the AC does not answer;
-    // a 2.7 kHz tone sounds on both active and passive buzzers
-    tone(PIN_BUZZER, 2700, 60);
+    // beep so a press is heard even when the AC does not answer
+    beep();
 #endif
     pending_time = millis();
     bool on = pending_mode != "off";
@@ -596,7 +630,13 @@ void handleButtons() {
       ac.fan = FAN_AUTO;
     }
     HomieRange range = {false, 0};
+#ifdef PIN_BUZZER
+    quiet_send = true;
+#endif
     modeHandler(range, pending_mode);
+#ifdef PIN_BUZZER
+    quiet_send = false;
+#endif
   }
 }
 #endif
@@ -679,6 +719,9 @@ void loop() {
   Homie.loop();
   readPower();
   handleIR();
+#ifdef PIN_BUZZER
+  handleBeep();
+#endif
 #ifdef HAS_BUTTONS
   handleButtons();
 #endif

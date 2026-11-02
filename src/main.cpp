@@ -667,6 +667,7 @@ void setup() {
   pinMode(GREEN_LED_PIN, OUTPUT);
   Homie.setLedPin(RED_LED_PIN, HIGH);
 #endif
+  ac.Begin();
 #ifndef ELECTRAWIFI_NO_IR_RCV
   irrecv.setUnknownThreshold(100); 
   irrecv.enableIRIn();

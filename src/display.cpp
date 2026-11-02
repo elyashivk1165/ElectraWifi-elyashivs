@@ -11,6 +11,7 @@
 #define W 320
 #define H 170
 #define FRAME_MS 66  // about 15 frames a second
+#define ANIMATE_MS 120000  // animate for 2 minutes after a change, then hold a still frame
 
 // "Tiles" design: three rounded tiles. The big one on the left shows the set
 // temperature in dark digits on a fade of the mode's colors, with a light
@@ -38,6 +39,8 @@ static int cur_temp = 24;
 static String cur_fan = "auto";
 static bool background_dirty = true;
 static uint32_t last_frame = 0;
+static uint32_t animate_since = 0;  // when the state last changed
+static bool redraw = true;          // draw one more frame even while holding still
 
 static uint16_t rgb(uint8_t r, uint8_t g, uint8_t b) { return tft.color565(r, g, b); }
 
@@ -274,14 +277,13 @@ static void draw_link_dot(int x, int y, float t, uint16_t ring) {
 }
 
 static void draw_fan_bars(int x, int bottom, int w, int h, const String& fan, uint16_t color, uint16_t dim, float t) {
-  const int n = 4, gap = 6;
+  // three speeds like the AC; on auto the bars stay dim and the badge shows "auto"
+  const int n = 3, gap = 6;
   int bw = (w - gap * (n - 1)) / n;
   int level = fan_level(fan);
   for (int i = 0; i < n; i++) {
-    int bh = h * (0.4f + 0.2f * i);
-    uint16_t c = dim;
-    if (level == 0) c = blend((uint8_t)(90 + 165 * (0.5f + 0.5f * sinf(t * 4 - i * 0.9f))), color, dim);
-    else if (i < level) c = color;
+    int bh = h * (0.4f + 0.3f * i);
+    uint16_t c = (i < level) ? color : dim;
     gfx().fillSmoothRoundRect(x + i * (bw + gap), bottom - bh, bw, bh, 3, c, use_sprite ? 0x00FFFFFF : SCREEN_BG);
   }
 }
@@ -376,12 +378,15 @@ void display_show(bool power, const String& mode, int temperature, const String&
   cur_temp = temperature;
   cur_fan = fan;
   last_frame = 0;  // draw the new state right away
+  animate_since = millis();
+  redraw = true;
   display_tick();
 }
 
 void display_link(bool wifi, bool mqtt) {
   link_wifi = wifi;
   link_mqtt = mqtt;
+  redraw = true;  // show the new link dot even while the screen holds still
 }
 
 void display_tick() {
@@ -389,7 +394,10 @@ void display_tick() {
   // without a sprite every frame would flicker, so only draw on changes
   if (!use_sprite && last_frame) return;
   uint32_t now = millis();
+  // after a while without changes stop animating, so the chip is free for the AC
+  if (!redraw && now - animate_since > ANIMATE_MS) return;
   if (last_frame && now - last_frame < FRAME_MS) return;
+  redraw = false;
   last_frame = now ? now : 1;
   draw_frame(now / 1000.0f);
 }

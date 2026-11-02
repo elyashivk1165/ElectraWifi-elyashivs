@@ -77,6 +77,8 @@ public:
     // Ctor, remote will be used to send the raw IR data
     IRelectra(uint8_t output_pin);
     
+    // Prepares the output (the hardware sender when ELECTRA_RMT is set); call from setup()
+    void Begin();
     // Sends the specified configuration to a GPIO pin
     void SendElectra(bool notify);
     void UpdateFromIR(uint64_t code);
@@ -99,4 +101,4 @@ private:
     void SendRaw(unsigned int *data, unsigned int size);
 };
 
-#endif
+#endif

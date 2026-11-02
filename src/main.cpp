@@ -91,10 +91,12 @@ ulong updates_send_time = 0;
 // steady pulse is the loudest beep. Feeding it a tone() only chops it.
 const ulong BEEP_MS = 150;
 // Quiet hours (Israel time, from the internet clock): a softer, shorter beep.
-// The active buzzer gets power in fast pulses, so it sounds weaker.
+// The active buzzer is chopped at 2.7 kHz, like the old tone() beep that the
+// user found quiet. (A 20 kHz PWM was too fast: the buzzer stayed silent.)
 const int NIGHT_FROM_HOUR = 20, NIGHT_TO_HOUR = 8;
 const ulong NIGHT_BEEP_MS = 80;
-const uint8_t NIGHT_DUTY = 40;   // out of 255; lower = quieter
+const uint32_t NIGHT_PWM_HZ = 2700;
+const uint8_t NIGHT_DUTY = 128;  // out of 255; lower = quieter
 const uint8_t BUZZER_PWM_CHANNEL = 7;
 const char* const ISRAEL_TZ = "IST-2IDT,M3.4.4/26,M10.5.0";
 bool beep_pwm = false;
@@ -145,7 +147,7 @@ void beep(ulong ms = BEEP_MS) {
   esp_timer_stop(beep_timer);
   beep_stop_locked();
   if (is_night()) {
-    ledcSetup(BUZZER_PWM_CHANNEL, 20000, 8);
+    ledcSetup(BUZZER_PWM_CHANNEL, NIGHT_PWM_HZ, 8);
     ledcAttachPin(PIN_BUZZER, BUZZER_PWM_CHANNEL);
     ledcWrite(BUZZER_PWM_CHANNEL, NIGHT_DUTY);
     beep_pwm = true;

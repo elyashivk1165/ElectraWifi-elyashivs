@@ -152,7 +152,7 @@ Update later with `git pull` and the `upload` command.
 - **Screen:** large set temperature on the left, on a gradient in the mode's color; mode icon and Hebrew name top right; 3 fan bars bottom right (auto = dim bars plus an "auto" badge); a link dot top left (green = MQTT, orange = WiFi only, red = no WiFi). Animations stop 2 minutes after the last change.
 - **Upper button (GPIO14):** on, then cool → heat → dry → fan → auto → off.
 - **Lower button (GPIO0):** fan low → med → high → auto. The command is sent about a second after the last press. Holding it 5 seconds triggers Homie's reset (erases WiFi/MQTT settings).
-- **Beeps:** a beep = command understood and sent (remote, buttons or Home Assistant). No beep after a remote press = the signal was not decoded (another remote, too far, or noise); noise stays silent on purpose. From 20:00 to 08:00 Israel time (internet clock) the beep is shorter and softer (PWM on the active buzzer); change `NIGHT_FROM_HOUR`, `NIGHT_TO_HOUR` and `NIGHT_DUTY` in `src/main.cpp`. Until the clock is set, beeps use the day volume.
+- **Beeps:** a beep = command understood and sent (remote, buttons or Home Assistant). No beep after a remote press = the signal was not decoded (another remote, too far, or noise); noise stays silent on purpose. From 20:00 to 08:00 Israel time (internet clock) the beep is shorter and softer (the active buzzer chopped at 2.7 kHz); change `NIGHT_FROM_HOUR`, `NIGHT_TO_HOUR` and `NIGHT_DUTY` in `src/main.cpp`. Until the clock is set, beeps use the day volume.
 
 ## Enclosure
 

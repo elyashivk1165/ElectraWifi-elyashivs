@@ -100,6 +100,7 @@ const char* const ISRAEL_TZ = "IST-2IDT,M3.4.4/26,M10.5.0";
 bool beep_pwm = false;
 bool quiet_send = false;  // set while the on-board buttons apply, they beep on press
 esp_timer_handle_t beep_timer = nullptr;
+SemaphoreHandle_t beep_lock = nullptr;  // the timer callback and a new beep never overlap
 
 bool is_night() {
   time_t now = time(nullptr);
@@ -113,7 +114,7 @@ bool is_night() {
 
 // Runs from a hardware timer, so the beep ends on time even while the loop is
 // busy sending a frame to the AC.
-void beep_stop(void* = nullptr) {
+void beep_stop_locked() {
   if (beep_pwm) {
     ledcWrite(BUZZER_PWM_CHANNEL, 0);
     ledcDetachPin(PIN_BUZZER);
@@ -123,15 +124,26 @@ void beep_stop(void* = nullptr) {
   digitalWrite(PIN_BUZZER, LOW);
 }
 
+void beep_stop(void*) {
+  xSemaphoreTake(beep_lock, portMAX_DELAY);
+  beep_stop_locked();
+  xSemaphoreGive(beep_lock);
+}
+
 void beep(ulong ms = BEEP_MS) {
+  if (!beep_lock) beep_lock = xSemaphoreCreateMutex();
   if (!beep_timer) {
     esp_timer_create_args_t args = {};
     args.callback = beep_stop;
     args.name = "beep";
-    esp_timer_create(&args, &beep_timer);
+    if (!beep_lock || esp_timer_create(&args, &beep_timer) != ESP_OK) {
+      beep_timer = nullptr;
+      return;  // no way to end the beep, so stay silent
+    }
   }
+  xSemaphoreTake(beep_lock, portMAX_DELAY);
   esp_timer_stop(beep_timer);
-  beep_stop();
+  beep_stop_locked();
   if (is_night()) {
     ledcSetup(BUZZER_PWM_CHANNEL, 20000, 8);
     ledcAttachPin(PIN_BUZZER, BUZZER_PWM_CHANNEL);
@@ -141,7 +153,8 @@ void beep(ulong ms = BEEP_MS) {
   } else {
     digitalWrite(PIN_BUZZER, HIGH);
   }
-  esp_timer_start_once(beep_timer, ms * 1000);
+  if (esp_timer_start_once(beep_timer, ms * 1000) != ESP_OK) beep_stop_locked();
+  xSemaphoreGive(beep_lock);
 }
 
 // a beep for commands that come from Home Assistant

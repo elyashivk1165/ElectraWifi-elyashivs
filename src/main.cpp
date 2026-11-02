@@ -90,17 +90,44 @@ ulong updates_send_time = 0;
 // The buzzer is an active one (it sounds by itself on steady power), so a
 // steady pulse is the loudest beep. Feeding it a tone() only chops it.
 const ulong BEEP_MS = 150;
+// Quiet hours (Israel time, from the internet clock): a softer, shorter beep.
+// The active buzzer gets power in fast pulses, so it sounds weaker.
+const int NIGHT_FROM_HOUR = 20, NIGHT_TO_HOUR = 8;
+const ulong NIGHT_BEEP_MS = 80;
+const uint8_t NIGHT_DUTY = 40;   // out of 255; lower = quieter
+const uint8_t BUZZER_PWM_CHANNEL = 7;
 ulong beep_off_at = 0;
+bool beep_pwm = false;
 bool quiet_send = false;  // set while the on-board buttons apply, they beep on press
 
+bool is_night() {
+  struct tm now;
+  if (!getLocalTime(&now, 0)) return false;  // clock not set yet: day volume
+  return now.tm_hour >= NIGHT_FROM_HOUR || now.tm_hour < NIGHT_TO_HOUR;
+}
+
 void beep(ulong ms = BEEP_MS) {
-  digitalWrite(PIN_BUZZER, HIGH);
+  if (is_night()) {
+    ledcSetup(BUZZER_PWM_CHANNEL, 20000, 8);
+    ledcAttachPin(PIN_BUZZER, BUZZER_PWM_CHANNEL);
+    ledcWrite(BUZZER_PWM_CHANNEL, NIGHT_DUTY);
+    beep_pwm = true;
+    ms = min(ms, NIGHT_BEEP_MS);
+  } else {
+    digitalWrite(PIN_BUZZER, HIGH);
+  }
   beep_off_at = millis() + ms;
   if (!beep_off_at) beep_off_at = 1;
 }
 
 void handleBeep() {
   if (beep_off_at && (long)(millis() - beep_off_at) >= 0) {
+    if (beep_pwm) {
+      ledcWrite(BUZZER_PWM_CHANNEL, 0);
+      ledcDetachPin(PIN_BUZZER);
+      pinMode(PIN_BUZZER, OUTPUT);
+      beep_pwm = false;
+    }
     digitalWrite(PIN_BUZZER, LOW);
     beep_off_at = 0;
   }
@@ -309,7 +336,13 @@ void publishDiscovery() {
 void onHomieEvent(const HomieEvent& event) {
   static bool wifi = false, mqtt = false;
   switch (event.type) {
-    case HomieEventType::WIFI_CONNECTED: wifi = true; break;
+    case HomieEventType::WIFI_CONNECTED:
+      wifi = true;
+#ifdef PIN_BUZZER
+      // Israel time with daylight saving, for the quiet night beep
+      configTzTime("IST-2IDT,M3.4.4/26,M10.5.0", "pool.ntp.org", "time.google.com");
+#endif
+      break;
     case HomieEventType::WIFI_DISCONNECTED: wifi = false; mqtt = false; break;
     case HomieEventType::MQTT_READY:
       mqtt = true;

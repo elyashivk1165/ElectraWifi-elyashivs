@@ -90,20 +90,73 @@ ulong updates_send_time = 0;
 // The buzzer is an active one (it sounds by itself on steady power), so a
 // steady pulse is the loudest beep. Feeding it a tone() only chops it.
 const ulong BEEP_MS = 150;
-ulong beep_off_at = 0;
+// Quiet hours (Israel time, from the internet clock): a softer, shorter beep.
+// The active buzzer is chopped at 2.7 kHz, like the old tone() beep that the
+// user found quiet. (A 20 kHz PWM was too fast: the buzzer stayed silent.)
+const int NIGHT_FROM_HOUR = 20, NIGHT_TO_HOUR = 8;
+const ulong NIGHT_BEEP_MS = 80;
+const uint32_t NIGHT_PWM_HZ = 2700;
+const uint8_t NIGHT_DUTY = 128;  // out of 255; lower = quieter
+const uint8_t BUZZER_PWM_CHANNEL = 7;
+const char* const ISRAEL_TZ = "IST-2IDT,M3.4.4/26,M10.5.0";
+bool beep_pwm = false;
 bool quiet_send = false;  // set while the on-board buttons apply, they beep on press
+esp_timer_handle_t beep_timer = nullptr;
+SemaphoreHandle_t beep_lock = nullptr;  // the timer callback and a new beep never overlap
 
-void beep(ulong ms = BEEP_MS) {
-  digitalWrite(PIN_BUZZER, HIGH);
-  beep_off_at = millis() + ms;
-  if (!beep_off_at) beep_off_at = 1;
+bool is_night() {
+  time_t now = time(nullptr);
+  if (now < 1700000000) return false;  // clock not set yet: day volume
+  struct tm local;
+  localtime_r(&now, &local);
+  if (NIGHT_FROM_HOUR > NIGHT_TO_HOUR)  // the quiet hours cross midnight
+    return local.tm_hour >= NIGHT_FROM_HOUR || local.tm_hour < NIGHT_TO_HOUR;
+  return local.tm_hour >= NIGHT_FROM_HOUR && local.tm_hour < NIGHT_TO_HOUR;
 }
 
-void handleBeep() {
-  if (beep_off_at && (long)(millis() - beep_off_at) >= 0) {
-    digitalWrite(PIN_BUZZER, LOW);
-    beep_off_at = 0;
+// Runs from a hardware timer, so the beep ends on time even while the loop is
+// busy sending a frame to the AC.
+void beep_stop_locked() {
+  if (beep_pwm) {
+    ledcWrite(BUZZER_PWM_CHANNEL, 0);
+    ledcDetachPin(PIN_BUZZER);
+    pinMode(PIN_BUZZER, OUTPUT);
+    beep_pwm = false;
   }
+  digitalWrite(PIN_BUZZER, LOW);
+}
+
+void beep_stop(void*) {
+  xSemaphoreTake(beep_lock, portMAX_DELAY);
+  beep_stop_locked();
+  xSemaphoreGive(beep_lock);
+}
+
+void beep(ulong ms = BEEP_MS) {
+  if (!beep_lock) beep_lock = xSemaphoreCreateMutex();
+  if (!beep_timer) {
+    esp_timer_create_args_t args = {};
+    args.callback = beep_stop;
+    args.name = "beep";
+    if (!beep_lock || esp_timer_create(&args, &beep_timer) != ESP_OK) {
+      beep_timer = nullptr;
+      return;  // no way to end the beep, so stay silent
+    }
+  }
+  xSemaphoreTake(beep_lock, portMAX_DELAY);
+  esp_timer_stop(beep_timer);
+  beep_stop_locked();
+  if (is_night()) {
+    ledcSetup(BUZZER_PWM_CHANNEL, NIGHT_PWM_HZ, 8);
+    ledcAttachPin(PIN_BUZZER, BUZZER_PWM_CHANNEL);
+    ledcWrite(BUZZER_PWM_CHANNEL, NIGHT_DUTY);
+    beep_pwm = true;
+    ms = min(ms, NIGHT_BEEP_MS);
+  } else {
+    digitalWrite(PIN_BUZZER, HIGH);
+  }
+  if (esp_timer_start_once(beep_timer, ms * 1000) != ESP_OK) beep_stop_locked();
+  xSemaphoreGive(beep_lock);
 }
 
 // a beep for commands that come from Home Assistant
@@ -309,7 +362,13 @@ void publishDiscovery() {
 void onHomieEvent(const HomieEvent& event) {
   static bool wifi = false, mqtt = false;
   switch (event.type) {
-    case HomieEventType::WIFI_CONNECTED: wifi = true; break;
+    case HomieEventType::WIFI_CONNECTED:
+      wifi = true;
+#ifdef PIN_BUZZER
+      // internet clock for the quiet night beep (keeps the Israel time zone)
+      configTzTime(ISRAEL_TZ, "pool.ntp.org", "time.google.com");
+#endif
+      break;
     case HomieEventType::WIFI_DISCONNECTED: wifi = false; mqtt = false; break;
     case HomieEventType::MQTT_READY:
       mqtt = true;
@@ -704,6 +763,9 @@ void setup() {
   pinMode(PIN_BTN_FAN, INPUT_PULLUP);
 #endif
 #ifdef PIN_BUZZER
+  // Israel time zone from the start, so a restart without WiFi still keeps local time
+  setenv("TZ", ISRAEL_TZ, 1);
+  tzset();
   pinMode(PIN_BUZZER, OUTPUT);
   digitalWrite(PIN_BUZZER, LOW);
 #endif
@@ -727,9 +789,6 @@ void loop() {
   Homie.loop();
   readPower();
   handleIR();
-#ifdef PIN_BUZZER
-  handleBeep();
-#endif
 #ifdef HAS_BUTTONS
   handleButtons();
 #endif

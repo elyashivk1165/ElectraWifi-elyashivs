@@ -23,7 +23,7 @@ GROUPS = [
     ("TILE", 22, 700, MODES, False),
     ("BOOT", 33, 700, [("BRAND", "אלקטרה")], False),
     ("SMALL", 17, 500, MODES + [("STARTING", "מתחבר...")], False),
-    ("OFF", 40, 800, [("OFF", "כבוי")], False),
+    ("OFF", 58, 800, [("OFF", "כבוי")], False),
     ("DIG_HUGE", 96, 800, DIGITS, True),
     ("DIG_SMALL", 17, 500, DIGITS, True),
     ("DEG", 30, 700, [("C", "C")], False),

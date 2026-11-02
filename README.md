@@ -1,4 +1,9 @@
-# ElectraWifi
+# ElectraWifi (T-Display-S3 fork)
+
+> **This is a fork of [giladger/ElectraWifi](https://github.com/giladger/ElectraWifi).** It adds a build for the LILYGO T-Display-S3 with a Hebrew status screen, buttons, a buzzer, Home Assistant MQTT discovery and hardware-timed command output. Everything from the original project still works.
+>
+> **Full build guide for the T-Display-S3:** [English](docs/guide.md) · [עברית](docs/guide.he.md)
+
 This project intends to replace a plain Electra AC IR receiver with an ESP8266 to give it wifi capabilities and control it over MQTT.
 
 ## Description
@@ -32,6 +37,23 @@ Hook everything up according to the following schematic:
 ![](images/schematic.png)
 
 To use the code as-is, use GPIO4 for IR send, GPIO5 for power state input and GPIO14 for IR recv (optional).
+
+### LILYGO T-Display-S3
+The `t-display-s3` environment replaces the receiver with a LILYGO T-Display-S3 and shows the AC state (power, mode, temperature, fan) on its screen. The [full guide](docs/guide.md) ([עברית](docs/guide.he.md)) covers parts, wiring diagram, measurements, flashing, Home Assistant and troubleshooting; the summary is below. Homie is patched automatically at build time, so no manual edits are needed for this environment.
+
+Wiring (pin numbers as in the list above):
+- Pin 1 (5V) to `5V`, connector shell to `G`
+- Pin 3 (IR signal) to the collector of an NPN transistor; emitter to `G`; base through 1kΩ to `GPIO1`
+- Pin 4 (power LED) straight to `GPIO2`, plus 4.7kΩ from `GPIO2` to `3V` (not 5V). The AC only pulls this line down (measured on an empty socket: about 0.02V off, 0.7V running, never 5V); with the resistor the pin reads about 3V when the AC is off and under 1V when it runs, and the firmware reads it with the ADC with hysteresis. The chip's internal pull-up alone is too weak (0.1V off / 0.5V on). Check the line never exceeds 3.3V on your unit before connecting it; if it does, add a 10kΩ/22kΩ divider.
+- Buzzer: `GPIO10` through 1kΩ to the base of a second NPN transistor, emitter to `G`, collector to the buzzer's `-` leg, buzzer `+` to `5V`. Do not drive the buzzer straight from the pin, and do not wire it to the AC's beep pin (pin 6 sits at a steady 9-12V and the buzzer sounds continuously).
+- Pin 3 needs no pull-up on units where the AC holds the command line at 5V by itself (measured on an empty socket). Make sure the command line is really pin 3: pin 2 (heat LED) reads a steady 0V on an empty socket and ignores every command.
+- IR receiver `OUT` to `GPIO16`, `VCC` to `3V`, `GND` to `G` (all on the other pin row) (optional, keeps the original remote working)
+
+Buttons: the upper button (GPIO14) turns the AC on, steps through cool, heat, dry, fan and auto, then turns it off. The lower button (GPIO0) steps the fan through low, med, high and auto. The command is sent about a second after the last press. Holding the lower button for 5 seconds still triggers Homie's reset, which clears the WiFi and MQTT settings.
+
+Home Assistant: this environment announces the AC through MQTT discovery, so it appears under Settings → Devices & Services → MQTT as soon as the board connects. The manual `climate` YAML below is not needed for it.
+
+Never power the board from USB and from the AC's 5V at the same time.
 
 ### Software
 The code in this repo is based on [Homie](https://github.com/homieiot/homie-esp8266) for MQTT handling and for OTA.
@@ -93,7 +115,7 @@ After the esp is configured, it will subscribe to the following MQTT topics:
   - This topic accepts a json in the following format (all fields are mandatory), updates the state and send it to the AC unit:   
   `{"power": "on|off", "mode": "cool|heat|fan_only|dry|auto", "fan": "low|med|high|auto", "temperature": 15..30, "ifeel": "on|off", "swing":"on|off|hor|both"}`
   > Note: `"fan"` is also accepted as an alias for `"fan_only"` for backward compatibility.
-- .../ifeel_temperature/state/set
+- .../ifeel-temperature/state/set
   - This topic accepts a number between 5 and 36 and sends it to the main unit as a temperature received by the "i feel" function of the remote.
 - .../reboot/trigger/set
   - Publish `true` to this topic to reboot the device remotely.
@@ -278,4 +300,4 @@ Note: The protocol only supports integer values, so the temperature will be roun
 
 ### Credits
 
-Many thanks to @barakwei and [IRelectra](https://github.com/barakwei/IRelectra) for analyzing the IR protocol.
+Based on [giladger/ElectraWifi](https://github.com/giladger/ElectraWifi). Many thanks to @barakwei and [IRelectra](https://github.com/barakwei/IRelectra) for analyzing the IR protocol.

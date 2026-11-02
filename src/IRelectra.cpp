@@ -118,6 +118,53 @@ void IRelectra::SendElectra(bool notify) {
     SendRaw(data, i + 1);
 }
 
+#ifdef ELECTRA_RMT
+// The RMT peripheral plays the MARKs and SPACEs from hardware, so the timing
+// stays exact even while the screen is drawn, the buzzer starts or WiFi is busy.
+// Bit-banging with delayMicroseconds() was occasionally stretched by those, and
+// the AC then ignored that command.
+#include <driver/rmt.h>
+
+static const rmt_channel_t ELECTRA_RMT_CHANNEL = RMT_CHANNEL_0;
+static bool rmt_ready = false;
+
+void IRelectra::Begin() {
+    rmt_config_t config = RMT_DEFAULT_CONFIG_TX((gpio_num_t)output_pin, ELECTRA_RMT_CHANNEL);
+    config.clk_div = 80;                 // 80 MHz / 80 = 1 tick per microsecond
+    config.mem_block_num = 3;            // 144 items, room for the whole frame (about 110)
+    config.tx_config.carrier_en = false; // the AC line wants plain pulses, no 38 kHz
+    config.tx_config.idle_output_en = true;
+    config.tx_config.idle_level = RMT_IDLE_LEVEL_LOW;
+    rmt_ready = rmt_config(&config) == ESP_OK &&
+                rmt_driver_install(ELECTRA_RMT_CHANNEL, 0, 0) == ESP_OK;
+}
+
+void IRelectra::SendRaw(unsigned int *data, uint size) {
+    if (rmt_ready) {
+        static rmt_item32_t items[128];
+        uint n = 0;
+        for (uint i = 0; i < size && n < 128; i += 2, ++n) {
+            items[n].level0 = 1;  // MARK: transistor on, line pulled low
+            items[n].duration0 = data[i];
+            items[n].level1 = 0;
+            items[n].duration1 = (i + 1 < size) ? data[i + 1] : 0;
+        }
+        if (size % 2 == 0 && n < 128) {  // end marker after a trailing SPACE
+            items[n].val = 0;
+            ++n;
+        }
+        rmt_write_items(ELECTRA_RMT_CHANNEL, items, n, true);
+        return;
+    }
+    for (uint i = 0; i < size; ++i) {
+        digitalWrite(output_pin, (i % 2) ? LOW : HIGH);
+        delayMicroseconds(data[i]);
+    }
+    digitalWrite(output_pin, LOW);
+}
+#else
+void IRelectra::Begin() {}
+
 void IRelectra::SendRaw(unsigned int *data, uint size) {
     for (uint i = 0; i < size; ++i) {
         digitalWrite(output_pin, (i % 2) ? LOW : HIGH);
@@ -125,6 +172,7 @@ void IRelectra::SendRaw(unsigned int *data, uint size) {
     }
     digitalWrite(output_pin, LOW);
 }
+#endif
 
 
 // Encodes specific A/C configuration to a number that describes

@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="Arial, Helvetica, sans-serif" font-size="15">
+  <!-- Final wiring of the Electra display connector to a LILYGO T-Display-S3.
+       Connector drawn as the SOCKET in the AC (looking at the holes, notch up), repo pin numbers. -->
+  <rect width="1200" height="640" fill="#ffffff"/>
+  <defs>
+    <g id="gnd"><line x1="0" y1="0" x2="0" y2="10" stroke="#1f5fbf" stroke-width="2.5"/><line x1="-12" y1="10" x2="12" y2="10" stroke="#1f5fbf" stroke-width="2.5"/><line x1="-7" y1="15" x2="7" y2="15" stroke="#1f5fbf" stroke-width="2.5"/><line x1="-3" y1="20" x2="3" y2="20" stroke="#1f5fbf" stroke-width="2.5"/></g>
+  </defs>
+
+  <!-- connector -->
+  <text x="180" y="40" text-anchor="middle" font-weight="bold" font-size="17">AC socket (8-pin mini-DIN)</text>
+  <text x="180" y="60" text-anchor="middle" fill="#5d6b66" font-size="13">looking at the holes, notch up, repo numbers</text>
+  <circle cx="180" cy="250" r="150" fill="#fff" stroke="#1f5fbf" stroke-width="9"/>
+  <rect x="155" y="92" width="50" height="40" fill="#d5ddd9"/>
+  <g font-size="17" font-weight="bold" text-anchor="middle">
+    <circle cx="125" cy="185" r="20" fill="#fff" stroke="#999" stroke-width="2"/><text x="125" y="191" fill="#999">8</text>
+    <circle cx="180" cy="185" r="20" fill="#fff" stroke="#999" stroke-width="2"/><text x="180" y="191" fill="#999">7</text>
+    <circle cx="235" cy="185" r="20" fill="#fff" stroke="#999" stroke-width="2"/><text x="235" y="191" fill="#999">5</text>
+    <circle cx="115" cy="250" r="20" fill="#fde9cf" stroke="#e07a00" stroke-width="3"/><text x="115" y="256">4</text>
+    <circle cx="180" cy="250" r="20" fill="#f6d9e6" stroke="#b0306a" stroke-width="3"/><text x="180" y="256">6</text>
+    <circle cx="245" cy="250" r="20" fill="#f8d6d4" stroke="#d0342c" stroke-width="3"/><text x="245" y="256">1</text>
+    <circle cx="148" cy="315" r="20" fill="#d4eedf" stroke="#1d8a4e" stroke-width="3"/><text x="148" y="321">3</text>
+    <circle cx="212" cy="315" r="20" fill="#fff" stroke="#999" stroke-width="2"/><text x="212" y="321" fill="#999">2</text>
+  </g>
+  <g font-size="13">
+    <circle cx="40" cy="440" r="6" fill="#d0342c"/><text x="54" y="445">1 = +5V (red wire)</text>
+    <circle cx="40" cy="465" r="6" fill="#1d8a4e"/><text x="54" y="470">3 = commands (green wire)</text>
+    <circle cx="40" cy="490" r="6" fill="#e07a00"/><text x="54" y="495">4 = "AC running" LED line (orange wire)</text>
+    <circle cx="40" cy="515" r="6" fill="#1f5fbf"/><text x="54" y="520">shell = ground (blue wire)</text>
+    <circle cx="40" cy="540" r="6" fill="#b0306a"/><text x="54" y="545" font-weight="bold" fill="#b0306a">6 = AC beep line, 9-12V: NEVER connect</text>
+    <circle cx="40" cy="565" r="6" fill="#999"/><text x="54" y="570">2, 5, 7, 8 = not used</text>
+  </g>
+
+  <!-- board -->
+  <rect x="900" y="70" width="150" height="500" rx="10" fill="#fff" stroke="#5d6b66" stroke-width="2"/>
+  <text x="975" y="55" text-anchor="middle" font-weight="bold" font-size="17">T-Display-S3</text>
+  <text x="975" y="320" text-anchor="middle" fill="#5d6b66" font-size="13">back side</text>
+  <g font-size="14">
+    <circle cx="900" cy="100" r="6" fill="#b0306a"/><text x="912" y="105">3V</text>
+    <circle cx="900" cy="140" r="6" fill="#1d8a4e"/><text x="912" y="145">1</text>
+    <circle cx="900" cy="180" r="6" fill="#e07a00"/><text x="912" y="185">2</text>
+    <circle cx="900" cy="260" r="6" fill="#0b7f86"/><text x="912" y="265">10</text>
+    <circle cx="900" cy="500" r="6" fill="#1f5fbf"/><text x="912" y="505">G</text>
+    <circle cx="900" cy="540" r="6" fill="#d0342c"/><text x="912" y="545">+5V</text>
+    <circle cx="1050" cy="340" r="6" fill="#7a3fb5"/><text x="1038" y="345" text-anchor="end">16</text>
+    <circle cx="1050" cy="420" r="6" fill="#1f5fbf"/><text x="1038" y="425" text-anchor="end">G</text>
+    <circle cx="1050" cy="500" r="6" fill="#b0306a"/><text x="1038" y="505" text-anchor="end">3V</text>
+  </g>
+
+  <!-- command transistor -->
+  <polyline points="345,315 470,315 470,90 580,90 580,105" fill="none" stroke="#1d8a4e" stroke-width="3.5"/>
+  <circle cx="590" cy="140" r="32" fill="none" stroke="#17201d" stroke-width="2"/>
+  <line x1="603" y1="120" x2="603" y2="160" stroke="#17201d" stroke-width="3"/>
+  <polyline points="603,130 580,112 580,105" fill="none" stroke="#17201d" stroke-width="2.5"/>
+  <polyline points="603,150 580,168 580,178" fill="none" stroke="#17201d" stroke-width="2.5"/>
+  <use href="#gnd" x="580" y="178"/>
+  <text x="545" y="145" text-anchor="end" font-weight="bold">BC547 #1</text>
+  <text x="566" y="110" text-anchor="end" fill="#5d6b66" font-size="12">C</text>
+  <text x="566" y="180" text-anchor="end" fill="#5d6b66" font-size="12">E</text>
+  <text x="612" y="128" fill="#5d6b66" font-size="12">B</text>
+  <line x1="603" y1="140" x2="720" y2="140" stroke="#1d8a4e" stroke-width="3.5"/>
+  <rect x="720" y="129" width="60" height="22" rx="3" fill="#fff" stroke="#1d8a4e" stroke-width="2.5"/>
+  <text x="750" y="122" text-anchor="middle">1k</text>
+  <line x1="780" y1="140" x2="900" y2="140" stroke="#1d8a4e" stroke-width="3.5"/>
+  <text x="380" y="78" text-anchor="middle" fill="#5d6b66" font-size="13">collector straight to pin 3, no pull-up</text>
+
+  <!-- power sense -->
+  <polyline points="345,250 840,250 840,180 900,180" fill="none" stroke="#e07a00" stroke-width="3.5"/>
+  <polyline points="900,100 790,100 790,175" fill="none" stroke="#b0306a" stroke-width="2.5"/>
+  <rect x="779" y="175" width="22" height="50" rx="3" fill="#fff" stroke="#e07a00" stroke-width="2.5"/>
+  <text x="770" y="205" text-anchor="end">4.7k</text>
+  <line x1="790" y1="225" x2="790" y2="250" stroke="#e07a00" stroke-width="3.5"/>
+  <circle cx="790" cy="250" r="5" fill="#e07a00"/>
+  <text x="610" y="240" text-anchor="middle" fill="#5d6b66" font-size="13">pin 4 straight to GPIO2, 4.7k from GPIO2 to 3V (not 5V)</text>
+
+  <!-- buzzer -->
+  <polyline points="900,260 870,260 870,420 840,420" fill="none" stroke="#0b7f86" stroke-width="3.5"/>
+  <rect x="780" y="409" width="60" height="22" rx="3" fill="#fff" stroke="#0b7f86" stroke-width="2.5"/>
+  <text x="810" y="402" text-anchor="middle">1k</text>
+  <line x1="780" y1="420" x2="733" y2="420" stroke="#0b7f86" stroke-width="3.5"/>
+  <circle cx="720" cy="420" r="32" fill="none" stroke="#17201d" stroke-width="2"/>
+  <line x1="733" y1="400" x2="733" y2="440" stroke="#17201d" stroke-width="3"/>
+  <polyline points="733,410 710,392 710,380" fill="none" stroke="#17201d" stroke-width="2.5"/>
+  <polyline points="733,430 710,448 710,458" fill="none" stroke="#17201d" stroke-width="2.5"/>
+  <use href="#gnd" x="710" y="458"/>
+  <text x="675" y="425" text-anchor="end" font-weight="bold">BC547 #2</text>
+  <rect x="680" y="335" width="60" height="36" rx="18" fill="#fff" stroke="#0b7f86" stroke-width="2.5"/>
+  <text x="710" y="358" text-anchor="middle" font-size="13">buzzer</text>
+  <line x1="710" y1="371" x2="710" y2="380" stroke="#0b7f86" stroke-width="2.5"/>
+  <text x="722" y="379" font-size="12">-</text>
+  <line x1="710" y1="335" x2="710" y2="318" stroke="#d0342c" stroke-width="2.5"/>
+  <text x="700" y="312" text-anchor="end" fill="#d0342c" font-size="13">+ to +5V (active buzzer)</text>
+
+  <!-- IR receiver -->
+  <rect x="1100" y="320" width="85" height="200" rx="8" fill="#fff" stroke="#7a3fb5" stroke-width="2.5"/>
+  <text x="1142" y="305" text-anchor="middle" font-weight="bold" font-size="14">VS1838B</text>
+  <line x1="1050" y1="340" x2="1100" y2="340" stroke="#7a3fb5" stroke-width="3.5"/><text x="1106" y="345" font-size="12">OUT</text>
+  <line x1="1050" y1="420" x2="1100" y2="420" stroke="#1f5fbf" stroke-width="3.5"/><text x="1106" y="425" font-size="12">GND</text>
+  <line x1="1050" y1="500" x2="1100" y2="500" stroke="#b0306a" stroke-width="3.5"/><text x="1106" y="505" font-size="12">VCC</text>
+  <text x="1142" y="545" text-anchor="middle" fill="#b0306a" font-size="12">3V, not 5V</text>
+
+  <g font-size="13" font-weight="bold">
+    <text x="350" y="309" fill="#1d8a4e">to hole 3</text>
+    <text x="350" y="244" fill="#e07a00">to hole 4</text>
+    <text x="386" y="280" fill="#d0342c">to hole 1</text>
+    <text x="318" y="372" fill="#1f5fbf">to shell</text>
+  </g>
+  <!-- ground and 5V -->
+  <polyline points="320,345 400,500 900,500" fill="none" stroke="#1f5fbf" stroke-width="3.5"/>
+  <polyline points="345,262 380,262 380,540 900,540" fill="none" stroke="#d0342c" stroke-width="3.5"/>
+  <text x="640" y="490" text-anchor="middle" fill="#1f5fbf" font-size="13">shell to G</text>
+  <text x="640" y="560" text-anchor="middle" fill="#d0342c" font-size="13">pin 1 to +5V. Never with USB plugged in at the same time</text>
+  <text x="600" y="620" text-anchor="middle" fill="#5d6b66" font-size="13">ground symbol = connect to G on the board</text>
+</svg>
